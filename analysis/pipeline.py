@@ -1,11 +1,12 @@
 """
 GTI AI
 Analysis Pipeline
-Version 1.0
+Version 1.1
 """
 
 from analysis.market_analyzer import MarketAnalyzer
 from ai.confluence_engine import ConfluenceEngine
+from ai.decision_engine import DecisionEngine
 
 
 class AnalysisPipeline:
@@ -31,7 +32,12 @@ class AnalysisPipeline:
             news_allowed=True,
         )
 
+        decision = DecisionEngine.decide(result["score"])
+
         return {
             "analysis": analysis,
-            "decision": result,
+            "decision": {
+                **result,
+                "decision": decision,
+            },
         }
