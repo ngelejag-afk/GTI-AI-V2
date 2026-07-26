@@ -1,18 +1,23 @@
 """
 GTI AI
 Main AI Pipeline
-Version 3.0
+Version 3.1
 """
 
 from mt5.mt5_connector import MT5Connector
 from mt5.multi_timeframe_reader import MultiTimeframeReader
+from mt5.live_price import LivePriceService
+
 from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
 from analysis.confluence_analyzer import ConfluenceAnalyzer
-from mt5.live_price import LivePriceService
+
 from strategy.entry_engine import EntryEngine
 from strategy.stop_loss_engine import StopLossEngine
 from strategy.take_profit_engine import TakeProfitEngine
+
 from ai.signal_formatter import SignalFormatter
+
+from news.economic_calendar import EconomicCalendar
 
 
 SYMBOL = "XAUUSD"
@@ -23,6 +28,19 @@ def main() -> None:
 
     if not connector.connect():
         print("❌ Failed to connect to MetaTrader 5.")
+        return
+
+    print("✅ Connected to MetaTrader 5")
+
+    if not EconomicCalendar.trading_allowed():
+        print("🚫 Trading blocked due to HIGH impact news.")
+
+        events = EconomicCalendar.events()
+
+        for event in events:
+            print(f"• {event['title']} ({event['currency']})")
+
+        connector.disconnect()
         return
 
     market = MultiTimeframeReader.read(
@@ -44,7 +62,7 @@ def main() -> None:
     price = LivePriceService.get(SYMBOL)
 
     if price is None:
-        print("❌ Failed to read live price.")
+        print("❌ Unable to read live price.")
         connector.disconnect()
         return
 
