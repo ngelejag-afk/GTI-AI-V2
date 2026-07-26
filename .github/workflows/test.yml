@@ -1,1 +1,18 @@
+name: Test
 
+on:
+ push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repository check
+        run: |
+          echo "GTI-AI-V2 workflow is running successfully!"
