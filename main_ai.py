@@ -1,7 +1,7 @@
 """
 GTI AI
 Main AI Pipeline
-Version 3.1
+Version 4.0
 """
 
 from mt5.mt5_connector import MT5Connector
@@ -10,10 +10,11 @@ from mt5.live_price import LivePriceService
 
 from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
 from analysis.confluence_analyzer import ConfluenceAnalyzer
+from analysis.smc_analyzer import SMCAnalyzer
 
 from strategy.entry_engine import EntryEngine
-from strategy.stop_loss_engine import StopLossEngine
-from strategy.take_profit_engine import TakeProfitEngine
+from strategy.dynamic_stop_loss import DynamicStopLoss
+from strategy.dynamic_take_profit import DynamicTakeProfit
 
 from ai.signal_formatter import SignalFormatter
 
@@ -27,19 +28,11 @@ def main() -> None:
     connector = MT5Connector()
 
     if not connector.connect():
-        print("❌ Failed to connect to MetaTrader 5.")
+        print("❌ Failed to connect to MT5")
         return
 
-    print("✅ Connected to MetaTrader 5")
-
     if not EconomicCalendar.trading_allowed():
-        print("🚫 Trading blocked due to HIGH impact news.")
-
-        events = EconomicCalendar.events()
-
-        for event in events:
-            print(f"• {event['title']} ({event['currency']})")
-
+        print("🚫 Trading blocked due to high impact news.")
         connector.disconnect()
         return
 
@@ -50,19 +43,19 @@ def main() -> None:
 
     analysis = MultiTimeframeAnalyzer.analyze(market)
 
-    result = ConfluenceAnalyzer.analyze(analysis)
+    confluence = ConfluenceAnalyzer.analyze(analysis)
 
-    decision = result["decision"]
+    decision = confluence["decision"]
 
     if decision == "WAIT":
-        print("⏳ No trading opportunity.")
+        print("⏳ WAIT")
         connector.disconnect()
         return
 
     price = LivePriceService.get(SYMBOL)
 
     if price is None:
-        print("❌ Unable to read live price.")
+        print("❌ Live price unavailable.")
         connector.disconnect()
         return
 
@@ -72,15 +65,25 @@ def main() -> None:
         ask=price["ask"],
     )
 
-    stop_loss = StopLossEngine.calculate(
-        decision=decision,
-        entry=entry,
+    smc = SMCAnalyzer.analyze(
+        market["M15"],
     )
 
-    take_profit = TakeProfitEngine.calculate(
+    stop_loss = DynamicStopLoss.calculate(
         decision=decision,
         entry=entry,
-        stop_loss=stop_loss,
+        candles=market["M15"],
+    )
+
+    take_profit = DynamicTakeProfit.calculate(
+        decision=decision,
+        entry=entry,
+        candles=market["M15"],
+    )
+
+    confidence = min(
+        100,
+        confluence["confidence"] + (smc["score"] // 5),
     )
 
     signal = SignalFormatter.format(
@@ -89,7 +92,7 @@ def main() -> None:
         entry=entry,
         stop_loss=stop_loss,
         take_profit=take_profit,
-        confidence=result["confidence"],
+        confidence=confidence,
     )
 
     print(signal)
