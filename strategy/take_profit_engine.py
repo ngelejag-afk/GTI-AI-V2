@@ -1,42 +1,54 @@
 """
 GTI AI
 Take Profit Engine
-Version 1.0
+Version 2.0
 """
+
+from indicators.atr_engine import ATREngine
 
 
 class TakeProfitEngine:
     """
-    Calculates take profit levels using Risk:Reward ratios.
+    Calculates ATR-based Take Profit levels.
     """
 
     @staticmethod
     def calculate(
-        decision: str,
         entry: float,
-        stop_loss: float,
+        candles: list,
+        trade_type: str,
     ) -> dict:
         """
-        Returns TP1, TP2 and TP3.
+        Calculate ATR-based TP levels.
         """
-        risk = abs(entry - stop_loss)
 
-        if decision == "BUY":
+        atr = ATREngine.calculate(candles)
+
+        if atr == 0:
             return {
-                "tp1": round(entry + (risk * 1), 2),
-                "tp2": round(entry + (risk * 2), 2),
-                "tp3": round(entry + (risk * 3), 2),
+                "tp1": entry,
+                "tp2": entry,
+                "tp3": entry,
             }
 
-        if decision == "SELL":
+        trade_type = trade_type.upper()
+
+        if trade_type == "BUY":
             return {
-                "tp1": round(entry - (risk * 1), 2),
-                "tp2": round(entry - (risk * 2), 2),
-                "tp3": round(entry - (risk * 3), 2),
+                "tp1": entry + (atr * 2),
+                "tp2": entry + (atr * 3),
+                "tp3": entry + (atr * 5),
+            }
+
+        if trade_type == "SELL":
+            return {
+                "tp1": entry - (atr * 2),
+                "tp2": entry - (atr * 3),
+                "tp3": entry - (atr * 5),
             }
 
         return {
-            "tp1": 0.0,
-            "tp2": 0.0,
-            "tp3": 0.0,
+            "tp1": entry,
+            "tp2": entry,
+            "tp3": entry,
         }
