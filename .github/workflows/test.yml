@@ -1,55 +1,25 @@
-name: Tests
+from strategy.bos_engine import BOSEngine
+from strategy.choch_engine import CHOCHEngine
+from strategy.liquidity_sweep_engine import LiquiditySweepEngine
+from strategy.fvg_engine import FVGEngine
+from strategy.order_block_engine import OrderBlockEngine
+from strategy.smc_engine import SMCEngine
 
-on:
-  push:
-    branches:
-      - main
-      - master
 
-  pull_request:
+class SMCAnalyzer:
+    def __init__(self):
+        self.bos = BOSEngine()
+        self.choch = CHOCHEngine()
+        self.liquidity = LiquiditySweepEngine()
+        self.fvg = FVGEngine()
+        self.order_block = OrderBlockEngine()
+        self.engine = SMCEngine()
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ["3.11"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest
-
-      - name: Debug repository
-        run: |
-          echo "===== CURRENT DIRECTORY ====="
-          pwd
-
-          echo ""
-          echo "===== ROOT FILES ====="
-          ls -la
-
-          echo ""
-          echo "===== PROJECT STRUCTURE ====="
-          find . -maxdepth 2 | sort
-
-          echo ""
-          echo "===== PYTHON PATH ====="
-          python -c "import sys; print('\n'.join(sys.path))"
-
-      - name: Run tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -c "import sys; print(sys.path)"
-          pytest
+    def analyze(self, candles):
+        return self.engine.analyze(
+            bos=self.bos.bullish(candles),
+            choch=self.choch.bullish(candles),
+            liquidity=self.liquidity.buy_side(candles),
+            fvg=self.fvg.bullish(candles),
+            order_block=self.order_block.bullish(candles),
+        )
