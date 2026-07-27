@@ -1,3 +1,4 @@
+
 """
 GTI AI
 Multi Timeframe Analyzer
@@ -9,19 +10,14 @@ from analysis.market_analyzer import MarketAnalyzer
 
 class MultiTimeframeAnalyzer:
     """
-    Analyzes multiple timeframes independently.
+    Analyzes multiple timeframes.
     """
 
     @staticmethod
-    def analyze(data: dict) -> dict:
-        """
-        Returns analysis for each timeframe.
-        """
-        result = {}
+    def analyze(timeframes: dict) -> dict:
+        results = {}
 
-        for timeframe, candles in data.items():
-            prices = [candle.close for candle in candles]
+        for timeframe, candles in timeframes.items():
+            results[timeframe] = MarketAnalyzer.analyze(candles)
 
-            result[timeframe] = MarketAnalyzer.analyze(prices)
-
-        return result
+        return results
