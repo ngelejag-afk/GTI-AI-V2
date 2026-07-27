@@ -1,30 +1,40 @@
+
 """
 GTI AI
 Stop Loss Engine
-Version 1.0
+Version 2.0
 """
+
+from indicators.atr_engine import ATREngine
 
 
 class StopLossEngine:
     """
-    Calculates the stop loss price.
+    Calculates ATR-based Stop Loss.
     """
-
-    DEFAULT_POINTS = 5.0
 
     @staticmethod
     def calculate(
-        decision: str,
         entry: float,
-        points: float = DEFAULT_POINTS,
+        candles: list,
+        trade_type: str,
+        multiplier: float = 1.5,
     ) -> float:
         """
-        Returns the stop loss price.
+        Calculate Stop Loss using ATR.
         """
-        if decision == "BUY":
-            return round(entry - points, 2)
 
-        if decision == "SELL":
-            return round(entry + points, 2)
+        atr = ATREngine.calculate(candles)
 
-        return 0.0
+        if atr == 0:
+            return entry
+
+        trade_type = trade_type.upper()
+
+        if trade_type == "BUY":
+            return entry - (atr * multiplier)
+
+        if trade_type == "SELL":
+            return entry + (atr * multiplier)
+
+        return entry
