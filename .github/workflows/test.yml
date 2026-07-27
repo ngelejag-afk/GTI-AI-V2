@@ -29,7 +29,23 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install pytest
+          - name: Debug repository
+  run: |
+    echo "===== CURRENT DIRECTORY ====="
+    pwd
 
-      - name: Run tests
-        run: |
-          pytest
+    echo ""
+    echo "===== ROOT FILES ====="
+    ls -la
+
+    echo ""
+    echo "===== PROJECT STRUCTURE ====="
+    find . -maxdepth 2 | sort
+
+    echo ""
+    echo "===== PYTHON PATH ====="
+    python -c "import sys; print('\n'.join(sys.path))"
+
+- name: Run tests
+  run: |
+    pytest
