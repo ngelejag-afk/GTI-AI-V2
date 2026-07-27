@@ -1,42 +1,28 @@
 """
 GTI AI
-MT5 Timeframe Service
+Timeframe Service
 Version 1.0
 """
 
-import MetaTrader5 as mt5
+from __future__ import annotations
+
+try:
+    import MetaTrader5 as mt5
+except ModuleNotFoundError:
+    mt5 = None
 
 
 class TimeframeService:
     """
-    Provides MetaTrader 5 timeframe constants.
+    Provides MT5 timeframe constants.
     """
 
-    M1 = mt5.TIMEFRAME_M1
-    M5 = mt5.TIMEFRAME_M5
-    M15 = mt5.TIMEFRAME_M15
-    M30 = mt5.TIMEFRAME_M30
-
-    H1 = mt5.TIMEFRAME_H1
-    H4 = mt5.TIMEFRAME_H4
-
-    D1 = mt5.TIMEFRAME_D1
-    W1 = mt5.TIMEFRAME_W1
-    MN1 = mt5.TIMEFRAME_MN1
-
-    @staticmethod
-    def all() -> dict:
-        """
-        Returns all supported timeframes.
-        """
-        return {
-            "M1": TimeframeService.M1,
-            "M5": TimeframeService.M5,
-            "M15": TimeframeService.M15,
-            "M30": TimeframeService.M30,
-            "H1": TimeframeService.H1,
-            "H4": TimeframeService.H4,
-            "D1": TimeframeService.D1,
-            "W1": TimeframeService.W1,
-            "MN1": TimeframeService.MN1,
-        }
+    M1 = mt5.TIMEFRAME_M1 if mt5 else 1
+    M5 = mt5.TIMEFRAME_M5 if mt5 else 5
+    M15 = mt5.TIMEFRAME_M15 if mt5 else 15
+    M30 = mt5.TIMEFRAME_M30 if mt5 else 30
+    H1 = mt5.TIMEFRAME_H1 if mt5 else 60
+    H4 = mt5.TIMEFRAME_H4 if mt5 else 240
+    D1 = mt5.TIMEFRAME_D1 if mt5 else 1440
+    W1 = mt5.TIMEFRAME_W1 if mt5 else 10080
+    MN1 = mt5.TIMEFRAME_MN1 if mt5 else 43200
