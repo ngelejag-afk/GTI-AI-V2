@@ -1,17 +1,18 @@
 """
 GTI AI
 Backtesting Engine
-Version 1.0
+Version 2.0
 """
 
 from analysis.pipeline import AnalysisPipeline
 from strategy.stop_loss_engine import StopLossEngine
 from strategy.take_profit_engine import TakeProfitEngine
+from backtesting.backtest_simulator import BacktestSimulator
 
 
 class BacktestEngine:
     """
-    Runs historical backtests.
+    Runs historical backtests with trade simulation.
     """
 
     def __init__(self):
@@ -19,12 +20,12 @@ class BacktestEngine:
 
     def run(self, candles: list) -> list:
         """
-        Run a simple backtest over historical candles.
+        Run a backtest over historical candles.
         """
 
         results = []
 
-        for index in range(50, len(candles)):
+        for index in range(50, len(candles) - 1):
             history = candles[: index + 1]
 
             signal = self.pipeline.analyze(history)
@@ -46,13 +47,25 @@ class BacktestEngine:
                 trade_type=signal["signal"],
             )
 
+            tp_price = take_profit["tp1"]
+
+            status = BacktestSimulator.simulate(
+                candles=candles,
+                start_index=index + 1,
+                signal=signal["signal"],
+                entry=entry,
+                stop_loss=stop_loss,
+                take_profit=tp_price,
+            )
+
             results.append(
                 {
                     "time": history[-1].time,
                     "signal": signal["signal"],
                     "entry": entry,
                     "stop_loss": stop_loss,
-                    "take_profit": take_profit,
+                    "take_profit": tp_price,
+                    "status": status,
                 }
             )
 
