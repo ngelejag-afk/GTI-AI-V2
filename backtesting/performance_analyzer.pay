@@ -1,1 +1,44 @@
+"""
+GTI AI
+Performance Analyzer
+Version 1.0
+"""
 
+
+class PerformanceAnalyzer:
+    """
+    Calculates performance statistics from backtest results.
+    """
+
+    @staticmethod
+    def analyze(results: list[dict]) -> dict:
+        """
+        Analyze backtest results.
+        """
+
+        total = len(results)
+
+        if total == 0:
+            return {
+                "total_trades": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": 0.0,
+            }
+
+        wins = sum(
+            1
+            for trade in results
+            if trade.get("status") == "WIN"
+        )
+
+        losses = total - wins
+
+        win_rate = round((wins / total) * 100, 2)
+
+        return {
+            "total_trades": total,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": win_rate,
+        }
