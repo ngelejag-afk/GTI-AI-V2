@@ -47,6 +47,9 @@ jobs:
           echo "===== PYTHON PATH ====="
           python -c "import sys; print('\n'.join(sys.path))"
 
-      - name: Run tests
+          - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
+          python -c "import sys; print(sys.path)"
           pytest
