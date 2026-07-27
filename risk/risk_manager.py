@@ -1,51 +1,35 @@
 """
 GTI AI
 Risk Manager
-Version 1.0
+Version 2.0
 """
 
 
 class RiskManager:
     """
-    Calculates trading risk and position sizing.
+    Calculates position sizing based on account risk.
     """
 
     @staticmethod
-    def risk_amount(balance: float, risk_percent: float) -> float:
-        """
-        Returns the amount to risk.
-        """
-        return balance * (risk_percent / 100)
-
-    @staticmethod
-    def risk_reward(entry: float, stop_loss: float, take_profit: float) -> float:
-        """
-        Calculates Risk:Reward ratio.
-        """
-        risk = abs(entry - stop_loss)
-        reward = abs(take_profit - entry)
-
-        if risk == 0:
-            return 0.0
-
-        return round(reward / risk, 2)
-
-    @staticmethod
-    def position_size(
+    def calculate_lot_size(
         balance: float,
         risk_percent: float,
-        stop_loss_points: float,
-        value_per_point: float,
+        entry: float,
+        stop_loss: float,
+        pip_value: float = 1.0,
+        min_lot: float = 0.01,
     ) -> float:
         """
-        Calculates suggested position size.
+        Calculate lot size from account balance and stop loss distance.
         """
-        if stop_loss_points <= 0 or value_per_point <= 0:
-            return 0.0
 
-        risk = RiskManager.risk_amount(balance, risk_percent)
+        risk_amount = balance * (risk_percent / 100)
 
-        return round(
-            risk / (stop_loss_points * value_per_point),
-            2,
-        )
+        stop_distance = abs(entry - stop_loss)
+
+        if stop_distance <= 0:
+            return min_lot
+
+        lot = risk_amount / (stop_distance * pip_value)
+
+        return max(round(lot, 2), min_lot)
