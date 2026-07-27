@@ -1,42 +1,40 @@
-
 """
 GTI AI
-ATR Engine
+Average True Range Engine
 Version 1.0
 """
+
+from models.market_data import MarketData
 
 
 class ATREngine:
     """
-    Calculates the Average True Range (ATR).
+    Calculates Average True Range (ATR).
     """
 
     @staticmethod
-    def calculate(candles: list, period: int = 14) -> float:
+    def calculate(candles: list[MarketData], period: int = 14) -> float:
         """
-        Returns the ATR value.
+        Calculate ATR from candle data.
         """
+
         if len(candles) < period + 1:
             return 0.0
 
         true_ranges = []
 
-        for index in range(1, len(candles)):
-            current = candles[index]
-            previous = candles[index - 1]
+        for i in range(1, len(candles)):
+            current = candles[i]
+            previous = candles[i - 1]
 
-            high_low = current.high - current.low
-            high_close = abs(current.high - previous.close)
-            low_close = abs(current.low - previous.close)
-
-            true_range = max(
-                high_low,
-                high_close,
-                low_close,
+            tr = max(
+                current.high - current.low,
+                abs(current.high - previous.close),
+                abs(current.low - previous.close),
             )
 
-            true_ranges.append(true_range)
+            true_ranges.append(tr)
 
-        atr = sum(true_ranges[-period:]) / period
+        atr_values = true_ranges[-period:]
 
-        return round(atr, 2)
+        return sum(atr_values) / period
