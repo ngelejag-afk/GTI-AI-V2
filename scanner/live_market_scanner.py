@@ -1,7 +1,8 @@
+
 """
 GTI AI
 Live Market Scanner
-Version 1.1
+Version 1.2
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from analysis.confluence_analyzer import ConfluenceAnalyzer
 from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
 from mt5.mt5_connector import MT5Connector
 from mt5.multi_timeframe_reader import MultiTimeframeReader
+from web.dashboard_server import DashboardServer
 
 
 class LiveMarketScanner:
@@ -66,6 +68,9 @@ class LiveMarketScanner:
         try:
             while True:
                 signal = self.scan_once()
+
+                # Update browser dashboard
+                DashboardServer.update(signal)
 
                 decision = signal["decision"]
 
