@@ -1,25 +1,52 @@
 """
 GTI AI
 Decision Engine
-Version 1.0
+Version 2.0
 """
 
 
 class DecisionEngine:
     """
-    Converts a confluence score into a trading decision.
+    Converts analysis results into a trading decision.
     """
 
     @staticmethod
-    def decide(score: int) -> str:
+    def decide(score: int, trend: str = "UNKNOWN") -> str:
         """
-        Returns BUY, SELL, or WAIT based on confidence score.
+        Returns BUY, SELL or WAIT.
         """
-        if score >= 80:
+
+        trend = trend.upper()
+
+        if score >= 80 and trend == "BULLISH":
             return "BUY"
 
-        if score <= 20:
+        if score >= 80 and trend == "BEARISH":
             return "SELL"
 
         return "WAIT"
-ai/decision_engine.py
+
+    @staticmethod
+    def summary(score: int, trend: str = "UNKNOWN") -> dict:
+        """
+        Returns a complete decision summary.
+        """
+
+        decision = DecisionEngine.decide(score, trend)
+
+        if score >= 90:
+            strength = "VERY_STRONG"
+        elif score >= 75:
+            strength = "STRONG"
+        elif score >= 60:
+            strength = "MODERATE"
+        else:
+            strength = "WEAK"
+
+        return {
+            "decision": decision,
+            "score": score,
+            "trend": trend,
+            "strength": strength,
+            "trade_allowed": decision != "WAIT",
+        }
