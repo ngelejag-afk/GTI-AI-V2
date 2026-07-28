@@ -1,82 +1,51 @@
 """
 GTI AI
-Confluence Engine
+Confidence Engine
 Version 1.0
 """
 
 
-class ConfluenceEngine:
+class ConfidenceEngine:
     """
-    Combines analysis results into one confidence score.
+    Calculates confidence score from analysis results.
     """
 
-    def calculate(
-        self,
-        trend: str,
-        ema_aligned: bool,
-        bos: bool,
-        choch: bool,
-        liquidity: bool,
-        fvg: bool,
-        order_block: bool,
-        session_allowed: bool,
-        news_allowed: bool,
-    ) -> dict:
+    @staticmethod
+    def calculate(analysis: dict) -> dict:
+        """
+        Calculate confidence percentage.
+        """
 
         score = 0
-        reasons = []
 
-        if ema_aligned:
-            score += 15
-            reasons.append("EMA Alignment")
+        if analysis.get("trend") == "BULLISH":
+            score += 20
+        elif analysis.get("trend") == "BEARISH":
+            score += 20
 
-        if trend == "STRONG_BULLISH":
-            score += 15
-            reasons.append("Strong Bullish Trend")
+        if analysis.get("ema_alignment"):
+            score += 20
 
-        elif trend == "STRONG_BEARISH":
-            score += 15
-            reasons.append("Strong Bearish Trend")
+        if analysis.get("smc_confirmed"):
+            score += 30
 
-        if bos:
-            score += 15
-            reasons.append("Break Of Structure")
+        if analysis.get("multi_timeframe_confirmed"):
+            score += 20
 
-        if choch:
+        if analysis.get("news_safe", True):
             score += 10
-            reasons.append("Change Of Character")
 
-        if liquidity:
-            score += 10
-            reasons.append("Liquidity Sweep")
-
-        if fvg:
-            score += 10
-            reasons.append("Fair Value Gap")
-
-        if order_block:
-            score += 10
-            reasons.append("Order Block")
-
-        if session_allowed:
-            score += 10
-            reasons.append("Trading Session")
-
-        if news_allowed:
-            score += 5
-            reasons.append("No High Impact News")
-
-        if score >= 80:
-            decision = "BUY_OR_SELL"
-
-        elif score >= 60:
-            decision = "WATCH"
-
-        else:
-            decision = "NO_TRADE"
+        score = min(score, 100)
 
         return {
-            "score": score,
-            "decision": decision,
-            "reasons": reasons,
+            "confidence": score,
+            "grade": (
+                "A"
+                if score >= 90
+                else "B"
+                if score >= 75
+                else "C"
+                if score >= 60
+                else "D"
+            ),
         }
