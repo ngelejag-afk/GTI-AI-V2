@@ -1,13 +1,14 @@
 """
 GTI AI
 Dashboard Server
-Version 1.1
+Version 1.2
 """
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime
 
 from web.dashboard_style import DashboardStyle
+from web.dashboard_history import DashboardHistory
 
 
 class DashboardServer(BaseHTTPRequestHandler):
@@ -31,13 +32,26 @@ class DashboardServer(BaseHTTPRequestHandler):
             "updated": datetime.now().strftime("%H:%M:%S"),
         }
 
+        DashboardHistory.add(cls.signal)
+
     def do_GET(self):
-        html = DashboardStyle.html(self.signal)
+        page = DashboardStyle.html(self.signal)
+
+        page = page.replace(
+            "</body>",
+            f"""
+            <div style="margin-top:30px;">
+                <h2>Recent Signals</h2>
+                {DashboardHistory.html()}
+            </div>
+            </body>
+            """,
+        )
 
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(html.encode())
+        self.wfile.write(page.encode())
 
 
 def run(host: str = "0.0.0.0", port: int = 8000):
