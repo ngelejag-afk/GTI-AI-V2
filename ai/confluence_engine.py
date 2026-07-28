@@ -1,25 +1,33 @@
 """
 GTI AI
-Confidence Engine
+Confluence Engine
 Version 2.0
 """
 
 
-class ConfidenceEngine:
+class ConfluenceEngine:
     """
-    Calculates signal confidence from analysis results.
+    Calculates a confluence score from market conditions.
     """
 
     @staticmethod
-    def calculate(analysis: dict) -> dict:
+    def calculate(
+        trend: str,
+        ema_aligned: bool,
+        bos: bool,
+        choch: bool,
+        liquidity: bool,
+        fvg: bool,
+        order_block: bool,
+        session_allowed: bool,
+        news_allowed: bool,
+    ) -> dict:
         """
-        Calculate confidence score and grade.
+        Calculate overall market confluence.
         """
 
         score = 0
         reasons = []
-
-        trend = analysis.get("trend")
 
         if trend == "BULLISH":
             score += 20
@@ -29,36 +37,42 @@ class ConfidenceEngine:
             score += 20
             reasons.append("Bearish trend")
 
-        if analysis.get("ema_alignment", False):
-            score += 20
-            reasons.append("EMA alignment")
+        if ema_aligned:
+            score += 15
+            reasons.append("EMA aligned")
 
-        if analysis.get("smc_confirmed", False):
-            score += 30
-            reasons.append("SMC confirmed")
+        if bos:
+            score += 15
+            reasons.append("Break of Structure")
 
-        if analysis.get("multi_timeframe_confirmed", False):
-            score += 20
-            reasons.append("Multi-timeframe confirmation")
-
-        if analysis.get("news_safe", True):
+        if choch:
             score += 10
+            reasons.append("Change of Character")
+
+        if liquidity:
+            score += 10
+            reasons.append("Liquidity sweep")
+
+        if fvg:
+            score += 10
+            reasons.append("Fair Value Gap")
+
+        if order_block:
+            score += 10
+            reasons.append("Order Block")
+
+        if session_allowed:
+            score += 5
+            reasons.append("Trading session allowed")
+
+        if news_allowed:
+            score += 5
             reasons.append("News filter passed")
 
         score = min(score, 100)
 
-        if score >= 90:
-            grade = "A"
-        elif score >= 75:
-            grade = "B"
-        elif score >= 60:
-            grade = "C"
-        else:
-            grade = "D"
-
         return {
-            "confidence": score,
-            "grade": grade,
-            "strong_signal": score >= 75,
+            "score": score,
+            "confirmed": score >= 70,
             "reasons": reasons,
         }
