@@ -1,7 +1,7 @@
 """
 GTI AI
 Trading Controller
-Version 1.0
+Version 2.0
 """
 
 from config.settings import Settings
@@ -11,7 +11,7 @@ from execution.trade_executor import TradeExecutor
 
 class TradingController:
     """
-    Coordinates the trading workflow.
+    Coordinates the GTI AI trading workflow.
     """
 
     def __init__(self):
@@ -24,7 +24,7 @@ class TradingController:
         balance: float | None = None,
     ) -> dict:
         """
-        Execute one trading cycle.
+        Execute one complete trading cycle.
         """
 
         if balance is None:
@@ -37,13 +37,19 @@ class TradingController:
             symbol=Settings.SYMBOL,
         )
 
-        if not result.get("success"):
+        if not result.get("success", False):
             return result
 
-        trade = result["trade"]
+        trade = result.get("trade")
+
+        if trade is None:
+            return {
+                "success": False,
+                "message": "No trade generated.",
+            }
 
         if Settings.LIVE_TRADING:
-            return self.trade_executor.execute(
+            execution = self.trade_executor.execute(
                 symbol=trade["symbol"],
                 action=trade["action"],
                 volume=trade["volume"],
@@ -51,6 +57,13 @@ class TradingController:
                 stop_loss=trade["stop_loss"],
                 take_profit=trade["take_profit"],
             )
+
+            return {
+                "success": execution.get("success", False),
+                "mode": "LIVE",
+                "trade": trade,
+                "execution": execution,
+            }
 
         return {
             "success": True,
