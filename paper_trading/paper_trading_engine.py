@@ -1,7 +1,7 @@
 """
 GTI AI
 Paper Trading Engine
-Version 1.0
+Version 2.0
 """
 
 from analysis.pipeline import AnalysisPipeline
@@ -31,12 +31,26 @@ class PaperTradingEngine:
         Analyze the latest market data and create a paper trade.
         """
 
-        signal = self.pipeline.analyze(candles)
+        if not candles:
+            return {
+                "success": False,
+                "message": "No candle data.",
+            }
 
-        if signal.get("signal") not in ("BUY", "SELL"):
+        prices = [candle.close for candle in candles]
+
+        result = self.pipeline.analyze(
+            prices=prices,
+            candles=candles,
+        )
+
+        signal = result["signal"]
+
+        if signal["signal"] not in ("BUY", "SELL"):
             return {
                 "success": False,
                 "message": "No trading signal.",
+                "analysis": result,
             }
 
         entry = candles[-1].close
@@ -75,5 +89,6 @@ class PaperTradingEngine:
 
         return {
             "success": True,
+            "analysis": result,
             "trade": trade,
         }
