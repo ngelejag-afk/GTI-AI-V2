@@ -1,42 +1,57 @@
+
 """
 GTI AI
 Trading Engine
-Version 1.0
+Version 2.0
 """
 
-from analysis.pipeline import AnalysisPipeline
+from ai.confluence_engine import ConfluenceEngine
+from ai.confidence_engine import ConfidenceEngine
 from ai.signal_engine import SignalEngine
 
 
 class TradingEngine:
     """
-    Main AI trading engine.
+    Coordinates AI trading decision generation.
     """
 
-    def __init__(self):
-        self.pipeline = AnalysisPipeline()
-
-    def analyze(
-        self,
-        symbol: str,
-        prices: list[float],
-        entry: float,
-        stop_loss: float,
-        take_profit_1: float,
-        take_profit_2: float,
+    @staticmethod
+    def generate_signal(
+        trend: str,
+        ema_aligned: bool,
+        smc: dict,
+        multi_timeframe_confirmed: bool,
+        news_safe: bool = True,
     ) -> dict:
+        """
+        Generate the final AI trading signal.
+        """
 
-        result = self.pipeline.analyze(prices)
-
-        signal = SignalEngine.generate(
-            symbol=symbol,
-            action=result["decision"]["decision"],
-            entry=entry,
-            stop_loss=stop_loss,
-            take_profit_1=take_profit_1,
-            take_profit_2=take_profit_2,
-            confidence=result["decision"]["score"],
-            reasons=result["decision"]["reasons"],
+        confluence = ConfluenceEngine.calculate(
+            trend=trend,
+            ema_aligned=ema_aligned,
+            bos=smc.get("bos", False),
+            choch=smc.get("choch", False),
+            liquidity=smc.get("liquidity", False),
+            fvg=smc.get("fvg", False),
+            order_block=smc.get("order_block", False),
+            session_allowed=True,
+            news_allowed=news_safe,
         )
 
-        return signal
+        confidence = ConfidenceEngine.calculate(
+            {
+                "trend": trend,
+                "ema_alignment": ema_aligned,
+                "smc_confirmed": smc.get("confirmed", False),
+                "multi_timeframe_confirmed": multi_timeframe_confirmed,
+                "news_safe": news_safe,
+            }
+        )
+
+        return SignalEngine.generate(
+            trend=trend,
+            score=confluence["score"],
+            confidence=confidence["confidence"],
+            reasons=confluence["reasons"] + confidence["reasons"],
+        )
