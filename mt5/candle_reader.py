@@ -1,7 +1,8 @@
+
 """
 GTI AI
 Candle Reader
-Version 1.0
+Version 2.0
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ class CandleReader:
 
         Returns an empty list if MT5 is unavailable.
         """
+
         if not self.connector.connect():
             return []
 
@@ -37,3 +39,15 @@ class CandleReader:
             return []
 
         return list(rates)
+
+    @staticmethod
+    def read(symbol: str, timeframe, count: int = 100):
+        """
+        Compatibility wrapper used by MultiTimeframeReader.
+        """
+
+        return CandleReader().get_candles(
+            symbol=symbol,
+            timeframe=timeframe,
+            count=count,
+        )
