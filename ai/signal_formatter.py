@@ -1,36 +1,38 @@
 """
 GTI AI
-Signal Engine
+Signal Formatter
 Version 2.0
 """
 
-from ai.decision_engine import DecisionEngine
 
-
-class SignalEngine:
+class SignalFormatter:
     """
-    Builds the final trading signal.
+    Formats trading signals for display.
     """
 
     @staticmethod
-    def generate(
-        trend: str,
-        score: int,
-        confidence: int,
-        reasons: list[str],
-    ) -> dict:
+    def format(signal: dict) -> str:
         """
-        Generate the final trading signal.
+        Return a formatted trading signal.
         """
 
-        decision = DecisionEngine.summary(score, trend)
+        reasons = "\n".join(
+            f"✔ {reason}" for reason in signal.get("reasons", [])
+        )
 
-        return {
-            "signal": decision["decision"],
-            "trend": trend,
-            "score": score,
-            "confidence": confidence,
-            "strength": decision["strength"],
-            "trade_allowed": decision["trade_allowed"],
-            "reasons": reasons,
-        }
+        return f"""
+==============================
+GTI AI SIGNAL
+==============================
+Signal      : {signal.get("signal")}
+Trend       : {signal.get("trend")}
+Score       : {signal.get("score")}
+Confidence  : {signal.get("confidence")}%
+Strength    : {signal.get("strength")}
+
+Reasons:
+{reasons}
+
+Trade Allowed : {signal.get("trade_allowed")}
+==============================
+""".strip()
