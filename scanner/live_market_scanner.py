@@ -1,22 +1,22 @@
 """
 GTI AI
 Live Market Scanner
-Version 1.0
+Version 1.1
 """
 
 from __future__ import annotations
 
 import time
 
+from analysis.confluence_analyzer import ConfluenceAnalyzer
+from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
 from mt5.mt5_connector import MT5Connector
 from mt5.multi_timeframe_reader import MultiTimeframeReader
-from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
-from analysis.confluence_analyzer import ConfluenceAnalyzer
 
 
 class LiveMarketScanner:
     """
-    Continuously scans the market and generates trading signals.
+    Continuously scans the market and reports only new signals.
     """
 
     def __init__(
@@ -29,10 +29,11 @@ class LiveMarketScanner:
         self.bars = bars
         self.interval = interval
         self.connector = MT5Connector()
+        self.last_signal = None
 
-    def scan_once(self) -> dict | None:
+    def scan_once(self) -> dict:
         """
-        Run one complete market scan.
+        Execute one market scan.
         """
 
         market_data = MultiTimeframeReader.read(
@@ -41,46 +42,48 @@ class LiveMarketScanner:
         )
 
         analysis = MultiTimeframeAnalyzer.analyze(market_data)
-        result = ConfluenceAnalyzer.analyze(analysis)
+        signal = ConfluenceAnalyzer.analyze(analysis)
 
-        return {
-            "analysis": analysis,
-            "signal": result,
-        }
+        return signal
 
     def run(self) -> None:
         """
-        Start continuous market monitoring.
+        Start continuous scanning.
         """
 
         if not self.connector.connect():
-            print("❌ Failed to connect to MetaTrader 5.")
+            print("❌ Unable to connect to MetaTrader 5.")
             return
 
-        print("====================================")
+        print("=" * 45)
         print(" GTI AI LIVE MARKET SCANNER")
-        print("====================================")
-        print(f"Symbol  : {self.symbol}")
-        print(f"Refresh : {self.interval} seconds")
+        print("=" * 45)
+        print(f"Symbol   : {self.symbol}")
+        print(f"Refresh  : {self.interval} seconds")
         print("Press Ctrl+C to stop.")
-        print("====================================")
+        print("=" * 45)
 
         try:
             while True:
-                result = self.scan_once()
+                signal = self.scan_once()
 
-                if result is not None:
-                    signal = result["signal"]
+                decision = signal["decision"]
 
-                    print("\n------------------------------------")
-                    print(f"Decision   : {signal['decision']}")
+                if decision != self.last_signal:
+                    self.last_signal = decision
+
+                    print()
+                    print("=" * 45)
+                    print(" NEW MARKET SIGNAL")
+                    print("=" * 45)
+                    print(f"Decision   : {decision}")
                     print(f"Confidence : {signal['confidence']}%")
-                    print(
-                        f"Bullish    : {signal['bullish_votes']}"
-                    )
-                    print(
-                        f"Bearish    : {signal['bearish_votes']}"
-                    )
+                    print(f"Bullish    : {signal['bullish_votes']}")
+                    print(f"Bearish    : {signal['bearish_votes']}")
+                    print("=" * 45)
+
+                else:
+                    print(f"No signal change ({decision})")
 
                 time.sleep(self.interval)
 
