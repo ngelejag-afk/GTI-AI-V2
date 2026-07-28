@@ -1,7 +1,7 @@
 """
 GTI AI
 SMC Analyzer
-Version 2.0
+Version 2.1
 """
 
 from strategy.bos_engine import BOSEngine
@@ -23,16 +23,7 @@ class SMCAnalyzer:
         Analyze Smart Money Concepts from candle data.
         """
 
-        if not candles:
-            return {
-                "score": 0,
-                "confirmed": False,
-                "bos": False,
-                "choch": False,
-                "liquidity": False,
-                "fvg": False,
-                "order_block": False,
-            }
+        candles = candles or []
 
         bos_engine = BOSEngine()
         choch_engine = CHOCHEngine()
@@ -40,11 +31,30 @@ class SMCAnalyzer:
         fvg_engine = FVGEngine()
         order_block_engine = OrderBlockEngine()
 
-        bos = bos_engine.bullish(candles)
-        choch = choch_engine.bullish(candles)
-        liquidity = liquidity_engine.buy_side(candles)
-        fvg = fvg_engine.bullish(candles)
-        order_block = order_block_engine.bullish(candles)
+        try:
+            bos = bos_engine.bullish(candles)
+        except Exception:
+            bos = False
+
+        try:
+            choch = choch_engine.bullish(candles)
+        except Exception:
+            choch = False
+
+        try:
+            liquidity = liquidity_engine.buy_side(candles)
+        except Exception:
+            liquidity = False
+
+        try:
+            fvg = fvg_engine.bullish(candles)
+        except Exception:
+            fvg = False
+
+        try:
+            order_block = order_block_engine.bullish(candles)
+        except Exception:
+            order_block = False
 
         return SMCEngine.analyze(
             bos=bos,
