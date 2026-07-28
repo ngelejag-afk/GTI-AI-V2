@@ -2,7 +2,7 @@
 """
 GTI AI
 Live Market Scanner
-Version 1.2
+Version 1.3
 """
 
 from __future__ import annotations
@@ -13,6 +13,8 @@ from analysis.confluence_analyzer import ConfluenceAnalyzer
 from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
 from mt5.mt5_connector import MT5Connector
 from mt5.multi_timeframe_reader import MultiTimeframeReader
+from risk.stop_loss_engine import StopLossEngine
+from risk.take_profit_engine import TakeProfitEngine
 from web.dashboard_server import DashboardServer
 
 
@@ -46,6 +48,28 @@ class LiveMarketScanner:
         analysis = MultiTimeframeAnalyzer.analyze(market_data)
         signal = ConfluenceAnalyzer.analyze(analysis)
 
+        timeframe = next(iter(market_data.values()), [])
+
+        if timeframe:
+            entry = round(float(timeframe[-1]["close"]), 2)
+        else:
+            entry = 0.0
+
+        stop_loss = StopLossEngine.calculate(
+            entry=entry,
+            decision=signal["decision"],
+        )
+
+        take_profit = TakeProfitEngine.calculate(
+            entry=entry,
+            stop_loss=stop_loss,
+            decision=signal["decision"],
+        )
+
+        signal["entry"] = entry
+        signal["stop_loss"] = stop_loss
+        signal["take_profit"] = take_profit
+
         return signal
 
     def run(self) -> None:
@@ -69,7 +93,6 @@ class LiveMarketScanner:
             while True:
                 signal = self.scan_once()
 
-                # Update browser dashboard
                 DashboardServer.update(signal)
 
                 decision = signal["decision"]
@@ -81,10 +104,13 @@ class LiveMarketScanner:
                     print("=" * 45)
                     print(" NEW MARKET SIGNAL")
                     print("=" * 45)
-                    print(f"Decision   : {decision}")
-                    print(f"Confidence : {signal['confidence']}%")
-                    print(f"Bullish    : {signal['bullish_votes']}")
-                    print(f"Bearish    : {signal['bearish_votes']}")
+                    print(f"Decision     : {decision}")
+                    print(f"Confidence   : {signal['confidence']}%")
+                    print(f"Entry Price  : {signal['entry']}")
+                    print(f"Stop Loss    : {signal['stop_loss']}")
+                    print(f"Take Profit  : {signal['take_profit']}")
+                    print(f"Bullish      : {signal['bullish_votes']}")
+                    print(f"Bearish      : {signal['bearish_votes']}")
                     print("=" * 45)
 
                 else:
