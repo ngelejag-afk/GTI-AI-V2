@@ -1,43 +1,54 @@
 """
 GTI AI
 Analysis Pipeline
-Version 1.1
+Version 2.0
 """
 
 from analysis.market_analyzer import MarketAnalyzer
-from ai.confluence_engine import ConfluenceEngine
-from ai.decision_engine import DecisionEngine
+from analysis.smc_analyzer import SMCAnalyzer
+from ai.trading_engine import TradingEngine
 
 
 class AnalysisPipeline:
     """
-    Runs the complete market analysis pipeline.
+    Runs the complete GTI AI analysis pipeline.
     """
 
-    def __init__(self):
-        self.confluence = ConfluenceEngine()
+    @staticmethod
+    def analyze(
+        prices: list[float],
+        candles: list | None = None,
+        news_safe: bool = True,
+    ) -> dict:
+        """
+        Analyze market data and generate a trading signal.
+        """
 
-    def analyze(self, prices: list[float]) -> dict:
         analysis = MarketAnalyzer.analyze(prices)
 
-        result = self.confluence.calculate(
-            trend=analysis["trend"],
-            ema_aligned=analysis["ema_aligned"],
-            bos=False,
-            choch=False,
-            liquidity=False,
-            fvg=False,
-            order_block=False,
-            session_allowed=True,
-            news_allowed=True,
+        smc = (
+            SMCAnalyzer.analyze(candles)
+            if candles
+            else {
+                "bos": False,
+                "choch": False,
+                "liquidity": False,
+                "fvg": False,
+                "order_block": False,
+                "confirmed": False,
+            }
         )
 
-        decision = DecisionEngine.decide(result["score"])
+        signal = TradingEngine.generate_signal(
+            trend=analysis["trend"],
+            ema_aligned=analysis["ema_aligned"],
+            smc=smc,
+            multi_timeframe_confirmed=False,
+            news_safe=news_safe,
+        )
 
         return {
             "analysis": analysis,
-            "decision": {
-                **result,
-                "decision": decision,
-            },
+            "smc": smc,
+            "signal": signal,
         }
