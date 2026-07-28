@@ -1,51 +1,64 @@
 """
 GTI AI
 Confidence Engine
-Version 1.0
+Version 2.0
 """
 
 
 class ConfidenceEngine:
     """
-    Calculates confidence score from analysis results.
+    Calculates signal confidence from analysis results.
     """
 
     @staticmethod
     def calculate(analysis: dict) -> dict:
         """
-        Calculate confidence percentage.
+        Calculate confidence score and grade.
         """
 
         score = 0
+        reasons = []
 
-        if analysis.get("trend") == "BULLISH":
-            score += 20
-        elif analysis.get("trend") == "BEARISH":
-            score += 20
+        trend = analysis.get("trend")
 
-        if analysis.get("ema_alignment"):
+        if trend == "BULLISH":
             score += 20
+            reasons.append("Bullish trend")
 
-        if analysis.get("smc_confirmed"):
+        elif trend == "BEARISH":
+            score += 20
+            reasons.append("Bearish trend")
+
+        if analysis.get("ema_alignment", False):
+            score += 20
+            reasons.append("EMA alignment")
+
+        if analysis.get("smc_confirmed", False):
             score += 30
+            reasons.append("SMC confirmed")
 
-        if analysis.get("multi_timeframe_confirmed"):
+        if analysis.get("multi_timeframe_confirmed", False):
             score += 20
+            reasons.append("Multi-timeframe confirmation")
 
         if analysis.get("news_safe", True):
             score += 10
+            reasons.append("News filter passed")
 
         score = min(score, 100)
 
+        if score >= 90:
+            grade = "A"
+        elif score >= 75:
+            grade = "B"
+        elif score >= 60:
+            grade = "C"
+        else:
+            grade = "D"
+
         return {
             "confidence": score,
-            "grade": (
-                "A"
-                if score >= 90
-                else "B"
-                if score >= 75
-                else "C"
-                if score >= 60
-                else "D"
-            ),
+            "grade": grade,
+            "strong_signal": score >= 75,
+            "reasons": reasons,
         }
