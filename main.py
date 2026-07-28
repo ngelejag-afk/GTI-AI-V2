@@ -1,47 +1,24 @@
 """
 GTI AI
-Main Pipeline
-Version 2.0
+Main Entry Point
+Version 1.0
 """
 
-from mt5.mt5_connector import MT5Connector
-from mt5.multi_timeframe_reader import MultiTimeframeReader
-from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
-from analysis.confluence_analyzer import ConfluenceAnalyzer
-
-
-SYMBOL = "XAUUSD"
+from web.run_dashboard import start_scanner
+from web.dashboard_server import run
+from threading import Thread
 
 
 def main() -> None:
-    connector = MT5Connector()
+    Thread(
+        target=start_scanner,
+        daemon=True,
+    ).start()
 
-    if not connector.connect():
-        print("❌ Failed to connect to MetaTrader 5.")
-        return
-
-    print("✅ Connected to MetaTrader 5")
-
-    market_data = MultiTimeframeReader.read(
-        symbol=SYMBOL,
-        bars=500,
+    run(
+        host="0.0.0.0",
+        port=8000,
     )
-
-    analysis = MultiTimeframeAnalyzer.analyze(market_data)
-
-    result = ConfluenceAnalyzer.analyze(analysis)
-
-    print("\n==============================")
-    print("GTI AI SIGNAL")
-    print("==============================")
-    print(f"Symbol      : {SYMBOL}")
-    print(f"Decision    : {result['decision']}")
-    print(f"Confidence  : {result['confidence']}%")
-    print(f"Bullish     : {result['bullish_votes']}")
-    print(f"Bearish     : {result['bearish_votes']}")
-    print("==============================\n")
-
-    connector.disconnect()
 
 
 if __name__ == "__main__":
