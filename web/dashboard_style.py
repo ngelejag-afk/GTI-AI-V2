@@ -1,7 +1,7 @@
 """
 GTI AI
 Dashboard Style
-Version 1.0
+Version 1.1
 """
 
 
@@ -23,10 +23,44 @@ class DashboardStyle:
         return "#FFD600"
 
     @staticmethod
+    def progress(confidence: int) -> str:
+        color = "#00C853"
+
+        if confidence < 70:
+            color = "#FFD600"
+
+        if confidence < 40:
+            color = "#D50000"
+
+        return f"""
+        <div style="
+            width:100%;
+            background:#333;
+            border-radius:10px;
+            overflow:hidden;
+            height:22px;
+        ">
+            <div style="
+                width:{confidence}%;
+                background:{color};
+                height:22px;
+                text-align:center;
+                color:white;
+                font-weight:bold;
+            ">
+                {confidence}%
+            </div>
+        </div>
+        """
+
+    @staticmethod
     def html(signal: dict) -> str:
-        color = DashboardStyle.color(
-            signal.get("decision", "WAIT")
-        )
+        decision = signal.get("decision", "WAIT")
+        confidence = signal.get("confidence", 0)
+        trend = signal.get("trend", "Unknown")
+        updated = signal.get("updated", "--")
+
+        color = DashboardStyle.color(decision)
 
         return f"""
 <html>
@@ -43,7 +77,7 @@ body {{
 background:#101010;
 color:white;
 font-family:Arial;
-padding:30px;
+padding:25px;
 }}
 
 .card {{
@@ -57,10 +91,11 @@ margin-bottom:20px;
 font-size:42px;
 font-weight:bold;
 color:{color};
+text-align:center;
 }}
 
 .value {{
-font-size:28px;
+font-size:26px;
 }}
 
 </style>
@@ -76,7 +111,9 @@ font-size:28px;
 <h2>Decision</h2>
 
 <div class="decision">
-{signal.get("decision","WAIT")}
+
+{decision}
+
 </div>
 
 </div>
@@ -85,18 +122,18 @@ font-size:28px;
 
 <h2>Confidence</h2>
 
-<div class="value">
-{signal.get("confidence",0)}%
-</div>
+{DashboardStyle.progress(confidence)}
 
 </div>
 
 <div class="card">
 
-<h2>Trend</h2>
+<h2>Market Trend</h2>
 
 <div class="value">
-{signal.get("trend","Unknown")}
+
+{trend}
+
 </div>
 
 </div>
@@ -106,7 +143,9 @@ font-size:28px;
 <h2>Updated</h2>
 
 <div class="value">
-{signal.get("updated","--")}
+
+{updated}
+
 </div>
 
 </div>
