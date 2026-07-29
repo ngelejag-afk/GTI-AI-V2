@@ -1,13 +1,14 @@
 """
 GTI AI
 Simulation Scanner
-Version 1.0
+Version 1.1
 """
 
 from __future__ import annotations
 
 import time
 
+from notifications.notification_engine import NotificationEngine
 from risk.stop_loss_engine import StopLossEngine
 from risk.take_profit_engine import TakeProfitEngine
 from scanner.simulation_engine import SimulationEngine
@@ -21,6 +22,7 @@ class SimulationScanner:
 
     def __init__(self, interval: int = 5) -> None:
         self.interval = interval
+        self.last_decision = None
 
     def run(self) -> None:
         print("=" * 45)
@@ -49,6 +51,10 @@ class SimulationScanner:
             signal["take_profit"] = take_profit
 
             DashboardServer.update(signal)
+
+            if signal["decision"] != self.last_decision:
+                self.last_decision = signal["decision"]
+                NotificationEngine.send(signal)
 
             print()
             print("=" * 45)
