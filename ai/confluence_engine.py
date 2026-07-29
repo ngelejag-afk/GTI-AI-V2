@@ -1,7 +1,7 @@
 """
 GTI AI
 Confluence Engine
-Version 2.0
+Version 3.0
 """
 
 
@@ -29,11 +29,13 @@ class ConfluenceEngine:
         score = 0
         reasons = []
 
-        if trend == "BULLISH":
+        trend = trend.upper()
+
+        if trend in ("BULLISH", "STRONG_BULLISH"):
             score += 20
             reasons.append("Bullish trend")
 
-        elif trend == "BEARISH":
+        elif trend in ("BEARISH", "STRONG_BEARISH"):
             score += 20
             reasons.append("Bearish trend")
 
