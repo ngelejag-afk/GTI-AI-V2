@@ -1,13 +1,14 @@
 """
 GTI AI
 Trade Executor
-Version 2.0
+Version 3.0
 """
 
 from __future__ import annotations
 
 from analysis.performance_monitor import PerformanceMonitor
 from execution.order_manager import OrderManager
+from execution.paper_trading_engine import PaperTradingEngine
 from execution.position_manager import PositionManager
 from execution.trade_history import TradeHistory
 from risk.account_risk_manager import AccountRiskManager
@@ -67,14 +68,19 @@ class TradeExecutor:
         order["risk_percent"] = risk["risk_percent"]
 
         PositionManager.open_position(order)
-
         TradeHistory.add(order)
 
-        PerformanceMonitor.record(
-            decision=order["decision"],
-            confidence=order["confidence"],
-            result="BREAKEVEN",
+        paper_trade = PaperTradingEngine.update(
+            order=order,
+            current_price=order["entry"],
         )
+
+        if paper_trade["status"] in ("WIN", "LOSS", "BREAKEVEN"):
+            PerformanceMonitor.record(
+                decision=order["decision"],
+                confidence=order["confidence"],
+                result=paper_trade["status"],
+            )
 
         print("=" * 50)
         print(" GTI AI TRADE EXECUTED")
@@ -87,6 +93,7 @@ class TradeExecutor:
         print(f"Lot Size      : {order['lot_size']}")
         print(f"Risk          : {order['risk_percent']}%")
         print(f"Confidence    : {order['confidence']}%")
+        print(f"Status        : {paper_trade['status']}")
         print("=" * 50)
 
         return True
