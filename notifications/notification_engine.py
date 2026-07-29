@@ -1,17 +1,22 @@
 """
 GTI AI
 Notification Engine
-Version 2.0
+Version 3.0
 """
+
+from __future__ import annotations
+
+from notifications.notification_history import NotificationHistory
 
 
 class NotificationEngine:
     """
     Central notification engine.
 
-    Currently prints notifications.
-    Future versions will support Android
-    Push Notifications.
+    Features:
+    - Formats notifications
+    - Prevents duplicate notifications
+    - Stores notification history
     """
 
     _last_message = ""
@@ -30,11 +35,7 @@ class NotificationEngine:
     @classmethod
     def send(cls, signal: dict) -> bool:
         """
-        Sends a notification.
-
-        Version 2:
-        - Prevent duplicate notifications
-        - Format notification message
+        Send a notification if it is new.
         """
 
         message = cls.format(signal)
@@ -43,6 +44,8 @@ class NotificationEngine:
             return False
 
         cls._last_message = message
+
+        NotificationHistory.add(signal)
 
         print()
         print("=" * 50)
@@ -56,3 +59,11 @@ class NotificationEngine:
     @classmethod
     def last_message(cls) -> str:
         return cls._last_message
+
+    @classmethod
+    def history(cls) -> list:
+        return NotificationHistory.get_all()
+
+    @classmethod
+    def clear_history(cls) -> None:
+        NotificationHistory.clear()
