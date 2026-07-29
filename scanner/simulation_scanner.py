@@ -1,13 +1,14 @@
 """
 GTI AI
 Simulation Scanner
-Version 1.1
+Version 2.0
 """
 
 from __future__ import annotations
 
 import time
 
+from execution.trade_executor import TradeExecutor
 from notifications.notification_engine import NotificationEngine
 from risk.stop_loss_engine import StopLossEngine
 from risk.take_profit_engine import TakeProfitEngine
@@ -17,7 +18,7 @@ from web.dashboard_server import DashboardServer
 
 class SimulationScanner:
     """
-    Runs the dashboard using simulated market signals.
+    Runs the GTI AI simulation scanner.
     """
 
     def __init__(self, interval: int = 5) -> None:
@@ -25,11 +26,13 @@ class SimulationScanner:
         self.last_decision = None
 
     def run(self) -> None:
-        print("=" * 45)
-        print(" GTI AI SIMULATION MODE")
-        print("=" * 45)
-        print(f"Refresh : {self.interval} seconds")
-        print("=" * 45)
+        """
+        Start simulation mode.
+        """
+
+        print("=" * 50)
+        print(" GTI AI SIMULATION SCANNER")
+        print("=" * 50)
 
         while True:
             signal = SimulationEngine.next_signal()
@@ -54,18 +57,26 @@ class SimulationScanner:
 
             if signal["decision"] != self.last_decision:
                 self.last_decision = signal["decision"]
+
                 NotificationEngine.send(signal)
 
+                if signal["decision"] in ("BUY", "SELL"):
+                    TradeExecutor.execute(signal)
+
             print()
-            print("=" * 45)
-            print(" SIMULATION SIGNAL")
-            print("=" * 45)
-            print(f"Decision     : {signal['decision']}")
-            print(f"Confidence   : {signal['confidence']}%")
-            print(f"Trend        : {signal['market_bias']}")
-            print(f"Entry        : {signal['entry']}")
-            print(f"Stop Loss    : {signal['stop_loss']}")
-            print(f"Take Profit  : {signal['take_profit']}")
-            print("=" * 45)
+            print("=" * 50)
+            print(" GTI AI SIGNAL")
+            print("=" * 50)
+            print(f"Decision      : {signal['decision']}")
+            print(f"Confidence    : {signal['confidence']}%")
+            print(f"Trend         : {signal['market_bias']}")
+            print(f"Entry         : {signal['entry']}")
+            print(f"Stop Loss     : {signal['stop_loss']}")
+            print(f"Take Profit   : {signal['take_profit']}")
+            print("=" * 50)
+
+            print()
+            print(f"Open Positions : {len(TradeExecutor.open_positions())}")
+            print(f"Trade History  : {len(TradeExecutor.trade_history())}")
 
             time.sleep(self.interval)
