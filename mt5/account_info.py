@@ -1,10 +1,12 @@
 """
 GTI AI
 MT5 Account Information
-Version 1.0
+Version 2.0
 """
 
 from __future__ import annotations
+
+from account.account_engine import AccountEngine
 
 try:
     import MetaTrader5 as mt5
@@ -14,7 +16,8 @@ except ImportError:
 
 class AccountInfo:
     """
-    Provides MetaTrader 5 account information.
+    Provides account information from MT5 when available,
+    otherwise from the simulated AccountEngine.
     """
 
     @staticmethod
@@ -31,36 +34,28 @@ class AccountInfo:
         Return account information.
         """
 
-        if mt5 is None:
-            return {
-                "connected": False,
-                "balance": 0.0,
-                "equity": 0.0,
-                "free_margin": 0.0,
-                "margin": 0.0,
-                "currency": "",
-                "leverage": 0,
-            }
+        if mt5 is not None and mt5.initialize():
+            info = mt5.account_info()
 
-        info = mt5.account_info()
+            if info is not None:
+                return {
+                    "connected": True,
+                    "balance": float(info.balance),
+                    "equity": float(info.equity),
+                    "free_margin": float(info.margin_free),
+                    "margin": float(info.margin),
+                    "currency": info.currency,
+                    "leverage": int(info.leverage),
+                }
 
-        if info is None:
-            return {
-                "connected": False,
-                "balance": 0.0,
-                "equity": 0.0,
-                "free_margin": 0.0,
-                "margin": 0.0,
-                "currency": "",
-                "leverage": 0,
-            }
+        simulated = AccountEngine.summary()
 
         return {
-            "connected": True,
-            "balance": float(info.balance),
-            "equity": float(info.equity),
-            "free_margin": float(info.margin_free),
-            "margin": float(info.margin),
-            "currency": info.currency,
-            "leverage": int(info.leverage),
+            "connected": False,
+            "balance": simulated["balance"],
+            "equity": simulated["equity"],
+            "free_margin": simulated["equity"],
+            "margin": 0.0,
+            "currency": "USD",
+            "leverage": 100,
         }
