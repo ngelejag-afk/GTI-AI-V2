@@ -1,13 +1,13 @@
-
 """
 GTI AI
 Trading Engine
-Version 2.0
+Version 3.0
 """
 
+from __future__ import annotations
+
 from ai.confluence_engine import ConfluenceEngine
-from ai.confidence_engine import ConfidenceEngine
-from ai.signal_engine import SignalEngine
+from ai.decision_engine import DecisionEngine
 
 
 class TradingEngine:
@@ -24,7 +24,7 @@ class TradingEngine:
         news_safe: bool = True,
     ) -> dict:
         """
-        Generate the final AI trading signal.
+        Generate the final AI trading decision.
         """
 
         confluence = ConfluenceEngine.calculate(
@@ -39,19 +39,22 @@ class TradingEngine:
             news_allowed=news_safe,
         )
 
-        confidence = ConfidenceEngine.calculate(
-            {
-                "trend": trend,
-                "ema_alignment": ema_aligned,
-                "smc_confirmed": smc.get("confirmed", False),
-                "multi_timeframe_confirmed": multi_timeframe_confirmed,
-                "news_safe": news_safe,
-            }
+        score = confluence["score"]
+
+        if multi_timeframe_confirmed:
+            score = min(score + 10, 100)
+
+        decision = DecisionEngine.summary(
+            score=score,
+            trend=trend,
         )
 
-        return SignalEngine.generate(
-            trend=trend,
-            score=confluence["score"],
-            confidence=confidence["confidence"],
-            reasons=confluence["reasons"] + confidence["reasons"],
-        )
+        return {
+            "signal": decision["decision"],
+            "trend": trend,
+            "score": score,
+            "confidence": score,
+            "strength": decision["strength"],
+            "trade_allowed": decision["trade_allowed"],
+            "reasons": confluence["reasons"],
+        }
