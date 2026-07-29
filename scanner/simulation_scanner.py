@@ -1,33 +1,52 @@
 """
 GTI AI
 Simulation Scanner
-Version 2.0
+Version 3.0
 """
 
 from __future__ import annotations
 
 import time
 
+from analysis.pipeline import AnalysisPipeline
+from execution.signal_adapter import SignalAdapter
 from execution.trade_executor import TradeExecutor
+from mt5.market_data_service import MarketDataService
 from notifications.notification_engine import NotificationEngine
-from risk.stop_loss_engine import StopLossEngine
-from risk.take_profit_engine import TakeProfitEngine
-from scanner.simulation_engine import SimulationEngine
 from web.dashboard_server import DashboardServer
 
 
 class SimulationScanner:
     """
-    Runs the GTI AI simulation scanner.
+    Runs the GTI AI simulation scanner using the AI pipeline.
     """
 
-    def __init__(self, interval: int = 5) -> None:
+    def __init__(
+        self,
+        symbol: str = "XAUUSD",
+        interval: int = 5,
+    ) -> None:
+        self.symbol = symbol
         self.interval = interval
         self.last_decision = None
 
+    def _build_wait_signal(self) -> dict:
+        """
+        Fallback signal used when market data is unavailable.
+        """
+
+        return {
+            "decision": "WAIT",
+            "market_bias": "UNKNOWN",
+            "entry": 0.0,
+            "stop_loss": 0.0,
+            "take_profit": 0.0,
+            "confidence": 0,
+        }
+
     def run(self) -> None:
         """
-        Start simulation mode.
+        Start AI simulation mode.
         """
 
         print("=" * 50)
@@ -35,23 +54,44 @@ class SimulationScanner:
         print("=" * 50)
 
         while True:
-            signal = SimulationEngine.next_signal()
-
-            entry = signal["entry"]
-
-            stop_loss = StopLossEngine.calculate(
-                entry=entry,
-                decision=signal["decision"],
+            market = MarketDataService.get_market_data(
+                symbol=self.symbol,
             )
 
-            take_profit = TakeProfitEngine.calculate(
-                entry=entry,
-                stop_loss=stop_loss,
-                decision=signal["decision"],
+            prices = (
+                market["close_prices"].get("M15")
+                or []
             )
 
-            signal["stop_loss"] = stop_loss
-            signal["take_profit"] = take_profit
+            candles = (
+                market["timeframes"].get("M15")
+                or []
+            )
+
+            latest_price = market.get("latest_price")
+
+            if not prices or latest_price is None:
+                signal = self._build_wait_signal()
+
+            else:
+                analysis = AnalysisPipeline.analyze(
+                    prices=prices,
+                    candles=candles,
+                    timeframes=market["close_prices"],
+                )
+
+                ai_signal = analysis["signal"]
+
+                signal = SignalAdapter.adapt(
+                    ai_signal=ai_signal,
+                    symbol=self.symbol,
+                    entry=latest_price,
+                )
+
+                signal["market_bias"] = ai_signal.get(
+                    "trend",
+                    "UNKNOWN",
+                )
 
             DashboardServer.update(signal)
 
@@ -76,7 +116,13 @@ class SimulationScanner:
             print("=" * 50)
 
             print()
-            print(f"Open Positions : {len(TradeExecutor.open_positions())}")
-            print(f"Trade History  : {len(TradeExecutor.trade_history())}")
+            print(
+                f"Open Positions : "
+                f"{len(TradeExecutor.open_positions())}"
+            )
+            print(
+                f"Trade History  : "
+                f"{len(TradeExecutor.trade_history())}"
+            )
 
             time.sleep(self.interval)
