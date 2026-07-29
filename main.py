@@ -1,33 +1,26 @@
 """
 GTI AI
 Main Entry Point
-Version 2.0
+Version 3.0
 """
 
-from threading import Thread
+from __future__ import annotations
 
-from scanner.simulation_scanner import SimulationScanner
-from web.dashboard_server import run
-
-
-def start_simulation() -> None:
-    """
-    Starts the simulation scanner.
-    """
-    scanner = SimulationScanner(interval=5)
-    scanner.run()
+from controller.gti_controller import GTIController
 
 
 def main() -> None:
-    Thread(
-        target=start_simulation,
-        daemon=True,
-    ).start()
+    """
+    Start the GTI AI system.
+    """
 
-    run(
-        host="0.0.0.0",
-        port=8000,
+    controller = GTIController(
+        simulation_mode=True,
+        dashboard_host="0.0.0.0",
+        dashboard_port=8000,
     )
+
+    controller.start()
 
 
 if __name__ == "__main__":
