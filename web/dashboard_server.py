@@ -1,15 +1,16 @@
-
 """
 GTI AI
 Dashboard Server
-Version 1.3
+Version 1.4
 """
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from web.dashboard_style import DashboardStyle
+from notifications.notification_center import NotificationCenter
+from web.dashboard_data import DashboardData
 from web.dashboard_history import DashboardHistory
+from web.dashboard_style import DashboardStyle
 
 
 class DashboardServer(BaseHTTPRequestHandler):
@@ -42,6 +43,9 @@ class DashboardServer(BaseHTTPRequestHandler):
         DashboardHistory.add(cls.signal)
 
     def do_GET(self):
+        dashboard = DashboardData.build(self.signal)
+        stats = dashboard["statistics"]
+
         page = DashboardStyle.html(self.signal)
 
         page = page.replace(
@@ -52,6 +56,15 @@ class DashboardServer(BaseHTTPRequestHandler):
                 <p><b>Entry:</b> {self.signal['entry']}</p>
                 <p><b>Stop Loss:</b> {self.signal['stop_loss']}</p>
                 <p><b>Take Profit:</b> {self.signal['take_profit']}</p>
+            </div>
+
+            <div class="card" style="margin-top:20px;">
+                <h2>Signal Statistics</h2>
+
+                <p><b>Total Signals:</b> {stats['TOTAL']}</p>
+                <p><b>BUY Signals:</b> {stats['BUY']}</p>
+                <p><b>SELL Signals:</b> {stats['SELL']}</p>
+                <p><b>WAIT Signals:</b> {stats['WAIT']}</p>
             </div>
 
             <div style="margin-top:30px;">
@@ -70,6 +83,10 @@ class DashboardServer(BaseHTTPRequestHandler):
 
 
 def run(host: str = "0.0.0.0", port: int = 8000):
+    """
+    Start the dashboard server.
+    """
+
     server = HTTPServer((host, port), DashboardServer)
 
     print("=" * 40)
