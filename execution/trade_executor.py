@@ -1,71 +1,73 @@
 """
 GTI AI
-Trade History
+Trade Executor
 Version 1.0
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from analysis.performance_monitor import PerformanceMonitor
+from execution.order_manager import OrderManager
+from execution.position_manager import PositionManager
+from execution.trade_history import TradeHistory
 
 
-class TradeHistory:
+class TradeExecutor:
     """
-    Stores executed trades in memory.
+    Executes validated trading signals.
     """
 
-    _trades = []
+    @classmethod
+    def execute(cls, signal: dict) -> bool:
+        """
+        Execute a trading signal.
+
+        Returns:
+            True if the trade was accepted.
+            False otherwise.
+        """
+
+        order = OrderManager.submit(signal)
+
+        if order is None:
+            return False
+
+        PositionManager.open_position(order)
+
+        TradeHistory.add(order)
+
+        # Placeholder until live trade results are available.
+        PerformanceMonitor.record(
+            decision=order["decision"],
+            confidence=order["confidence"],
+            result="BREAKEVEN",
+        )
+
+        print("=" * 50)
+        print(" GTI AI TRADE EXECUTED")
+        print("=" * 50)
+        print(f"Symbol      : {order['symbol']}")
+        print(f"Decision    : {order['decision']}")
+        print(f"Entry       : {order['entry']}")
+        print(f"Stop Loss   : {order['stop_loss']}")
+        print(f"Take Profit : {order['take_profit']}")
+        print(f"Confidence  : {order['confidence']}%")
+        print("=" * 50)
+
+        return True
 
     @classmethod
-    def add(cls, trade: dict) -> None:
+    def open_positions(cls) -> list:
         """
-        Store a trade record.
+        Return all open positions.
         """
 
-        record = {
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "symbol": trade.get("symbol", "XAUUSD"),
-            "decision": trade.get("decision", "WAIT"),
-            "entry": trade.get("entry", 0.0),
-            "stop_loss": trade.get("stop_loss", 0.0),
-            "take_profit": trade.get("take_profit", 0.0),
-            "confidence": trade.get("confidence", 0),
-            "status": trade.get("status", "OPEN"),
-        }
-
-        cls._trades.append(record)
+        return PositionManager.open_positions()
 
     @classmethod
-    def all(cls) -> list:
+    def trade_history(cls) -> list:
         """
-        Return all trades.
-        """
-
-        return list(cls._trades)
-
-    @classmethod
-    def latest(cls, limit: int = 10) -> list:
-        """
-        Return the latest trades.
+        Return executed trade history.
         """
 
-        if limit <= 0:
-            return []
-
-        return cls._trades[-limit:]
-
-    @classmethod
-    def total(cls) -> int:
-        """
-        Return total number of trades.
-        """
-
-        return len(cls._trades)
-
-    @classmethod
-    def clear(cls) -> None:
-        """
-        Clear trade history.
-        """
-
-        cls._trades.clear()
+        return TradeHistory.all()
