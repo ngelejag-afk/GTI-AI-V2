@@ -1,4 +1,4 @@
-name: Tests
+name: GTI AI Tests
 
 on:
   push:
@@ -27,29 +27,25 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
           pip install pytest
 
-      - name: Debug repository
-        run: |
-          echo "===== CURRENT DIRECTORY ====="
-          pwd
-
-          echo ""
-          echo "===== ROOT FILES ====="
-          ls -la
-
-          echo ""
-          echo "===== PROJECT STRUCTURE ====="
-          find . -maxdepth 2 | sort
-
-          echo ""
-          echo "===== PYTHON PATH ====="
-          python -c "import sys; print('\n'.join(sys.path))"
-
-      - name: Run tests
+      - name: Run Simulation Test
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          python -c "import sys; print(sys.path)"
+          echo "=============================="
+          echo "GTI AI Simulation Test"
+          echo "=============================="
+
+          python tests/simulation_test_runner.py
+
+      - name: Run Pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
           pytest
