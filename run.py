@@ -1,12 +1,14 @@
 """
 GTI AI
 Runner
-Version 1.0
+Version 2.0
 """
+
+from __future__ import annotations
 
 import time
 
-from main_ai import main
+from main import main
 
 
 REFRESH_SECONDS = 60
@@ -14,19 +16,23 @@ REFRESH_SECONDS = 60
 
 def run() -> None:
     """
-    Runs the AI continuously.
+    Runs the GTI AI system continuously.
     """
-    print("===================================")
-    print(" GTI AI V4 RUNNER STARTED")
-    print("===================================")
+
+    print("=" * 50)
+    print(" GTI AI V2 RUNNER")
+    print("=" * 50)
 
     while True:
         try:
             main()
+        except KeyboardInterrupt:
+            print("\nGTI AI stopped.")
+            break
         except Exception as error:
-            print(f"ERROR: {error}")
+            print(f"System Error: {error}")
 
-        print(f"Waiting {REFRESH_SECONDS} seconds...\n")
+        print(f"\nRestarting in {REFRESH_SECONDS} seconds...")
         time.sleep(REFRESH_SECONDS)
 
 
