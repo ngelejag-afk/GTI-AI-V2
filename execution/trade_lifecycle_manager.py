@@ -1,7 +1,7 @@
 """
 GTI AI
 Trade Lifecycle Manager
-Version 2.0
+Version 3.0
 """
 
 from __future__ import annotations
@@ -9,15 +9,13 @@ from __future__ import annotations
 from account.account_engine import AccountEngine
 from analysis.performance_monitor import PerformanceMonitor
 from execution.paper_trading_engine import PaperTradingEngine
+from execution.profit_loss_engine import ProfitLossEngine
 
 
 class TradeLifecycleManager:
     """
     Updates paper trades until they are closed.
     """
-
-    WIN_AMOUNT = 20.0
-    LOSS_AMOUNT = -10.0
 
     @staticmethod
     def update(
@@ -38,22 +36,27 @@ class TradeLifecycleManager:
                 current_price=current_price,
             )
 
-            position["current_price"] = result["current_price"]
+            position["current_price"] = current_price
+
+            pnl = ProfitLossEngine.calculate(
+                decision=position["decision"],
+                entry=position["entry"],
+                current_price=current_price,
+                lot_size=position.get("lot_size", 0.01),
+            )
+
+            position["floating_profit"] = pnl["profit"]
+            position["floating_pips"] = pnl["pips"]
+            position["floating_status"] = pnl["status"]
 
             if result["status"] == "OPEN":
                 continue
 
             position["status"] = result["status"]
 
-            if result["status"] == "WIN":
-                AccountEngine.apply_profit(
-                    TradeLifecycleManager.WIN_AMOUNT
-                )
-
-            elif result["status"] == "LOSS":
-                AccountEngine.apply_profit(
-                    TradeLifecycleManager.LOSS_AMOUNT
-                )
+            AccountEngine.apply_profit(
+                pnl["profit"]
+            )
 
             PerformanceMonitor.record(
                 decision=position["decision"],
