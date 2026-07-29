@@ -1,8 +1,7 @@
-
 """
 GTI AI
 Live Market Scanner
-Version 1.4
+Version 2.0
 """
 
 from __future__ import annotations
@@ -11,6 +10,7 @@ import time
 
 from analysis.confluence_analyzer import ConfluenceAnalyzer
 from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
+from execution.trade_executor import TradeExecutor
 from mt5.mt5_connector import MT5Connector
 from mt5.multi_timeframe_reader import MultiTimeframeReader
 from notifications.notification_engine import NotificationEngine
@@ -21,7 +21,7 @@ from web.dashboard_server import DashboardServer
 
 class LiveMarketScanner:
     """
-    Continuously scans the market and reports only new signals.
+    Continuously scans the live market.
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class LiveMarketScanner:
 
     def scan_once(self) -> dict:
         """
-        Execute one market scan.
+        Perform one market scan.
         """
 
         market_data = MultiTimeframeReader.read(
@@ -67,6 +67,7 @@ class LiveMarketScanner:
             decision=signal["decision"],
         )
 
+        signal["symbol"] = self.symbol
         signal["entry"] = entry
         signal["stop_loss"] = stop_loss
         signal["take_profit"] = take_profit
@@ -75,19 +76,16 @@ class LiveMarketScanner:
 
     def run(self) -> None:
         """
-        Start continuous scanning.
+        Start live scanning.
         """
 
         if not self.connector.connect():
-            print("❌ Unable to connect to MetaTrader 5.")
+            print("Unable to connect to MetaTrader 5.")
             return
 
-        print("=" * 45)
-        print(" GTI AI LIVE MARKET SCANNER")
-        print("=" * 45)
-        print(f"Symbol   : {self.symbol}")
-        print(f"Refresh  : {self.interval} seconds")
-        print("=" * 45)
+        print("=" * 50)
+        print(" GTI AI LIVE SCANNER")
+        print("=" * 50)
 
         try:
             while True:
@@ -102,31 +100,29 @@ class LiveMarketScanner:
 
                     NotificationEngine.send(signal)
 
-                    print()
-                    print("=" * 45)
-                    print(" NEW MARKET SIGNAL")
-                    print("=" * 45)
-                    print(f"Decision     : {decision}")
-                    print(f"Confidence   : {signal['confidence']}%")
-                    print(f"Entry Price  : {signal['entry']}")
-                    print(f"Stop Loss    : {signal['stop_loss']}")
-                    print(f"Take Profit  : {signal['take_profit']}")
+                    if decision in ("BUY", "SELL"):
+                        TradeExecutor.execute(signal)
 
-                    if "bullish_votes" in signal:
-                        print(f"Bullish      : {signal['bullish_votes']}")
+                print()
+                print("=" * 50)
+                print(" LIVE MARKET SIGNAL")
+                print("=" * 50)
+                print(f"Symbol        : {self.symbol}")
+                print(f"Decision      : {signal['decision']}")
+                print(f"Confidence    : {signal['confidence']}%")
+                print(f"Entry         : {signal['entry']}")
+                print(f"Stop Loss     : {signal['stop_loss']}")
+                print(f"Take Profit   : {signal['take_profit']}")
+                print("=" * 50)
 
-                    if "bearish_votes" in signal:
-                        print(f"Bearish      : {signal['bearish_votes']}")
-
-                    print("=" * 45)
-
-                else:
-                    print(f"No signal change ({decision})")
+                print()
+                print(f"Open Positions : {len(TradeExecutor.open_positions())}")
+                print(f"Trade History  : {len(TradeExecutor.trade_history())}")
 
                 time.sleep(self.interval)
 
         except KeyboardInterrupt:
-            print("\nScanner stopped.")
+            print("\nLive scanner stopped.")
 
         finally:
             self.connector.disconnect()
