@@ -1,13 +1,12 @@
 """
 GTI AI
 Dashboard Server
-Version 1.4
+Version 2.0
 """
 
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from notifications.notification_center import NotificationCenter
 from web.dashboard_data import DashboardData
 from web.dashboard_history import DashboardHistory
 from web.dashboard_style import DashboardStyle
@@ -15,7 +14,7 @@ from web.dashboard_style import DashboardStyle
 
 class DashboardServer(BaseHTTPRequestHandler):
     """
-    Simple browser dashboard.
+    GTI AI Dashboard Server.
     """
 
     signal = {
@@ -43,8 +42,12 @@ class DashboardServer(BaseHTTPRequestHandler):
         DashboardHistory.add(cls.signal)
 
     def do_GET(self):
-        dashboard = DashboardData.build(self.signal)
-        stats = dashboard["statistics"]
+        data = DashboardData.build(self.signal)
+
+        stats = data["statistics"]
+        account = data["account"]
+        positions = data["positions"]
+        performance = data["performance"]
 
         page = DashboardStyle.html(self.signal)
 
@@ -58,13 +61,39 @@ class DashboardServer(BaseHTTPRequestHandler):
                 <p><b>Take Profit:</b> {self.signal['take_profit']}</p>
             </div>
 
-            <div class="card" style="margin-top:20px;">
-                <h2>Signal Statistics</h2>
+            <div class="card">
+                <h2>AI Performance</h2>
+                <p><b>Total Trades:</b> {performance['total_trades']}</p>
+                <p><b>Wins:</b> {performance['wins']}</p>
+                <p><b>Losses:</b> {performance['losses']}</p>
+                <p><b>Breakeven:</b> {performance['breakeven']}</p>
+                <p><b>Win Rate:</b> {performance['win_rate']}%</p>
+                <p><b>Average Confidence:</b> {performance['average_confidence']}%</p>
+            </div>
 
-                <p><b>Total Signals:</b> {stats['TOTAL']}</p>
-                <p><b>BUY Signals:</b> {stats['BUY']}</p>
-                <p><b>SELL Signals:</b> {stats['SELL']}</p>
-                <p><b>WAIT Signals:</b> {stats['WAIT']}</p>
+            <div class="card">
+                <h2>Account</h2>
+                <p><b>Connected:</b> {account['connected']}</p>
+                <p><b>Balance:</b> {account['balance']}</p>
+                <p><b>Equity:</b> {account['equity']}</p>
+                <p><b>Free Margin:</b> {account['free_margin']}</p>
+                <p><b>Leverage:</b> {account['leverage']}</p>
+            </div>
+
+            <div class="card">
+                <h2>Open Positions</h2>
+                <p><b>Total:</b> {positions['total_positions']}</p>
+                <p><b>BUY:</b> {positions['buy_positions']}</p>
+                <p><b>SELL:</b> {positions['sell_positions']}</p>
+                <p><b>Floating P/L:</b> {positions['floating_profit']}</p>
+            </div>
+
+            <div class="card">
+                <h2>Signal Statistics</h2>
+                <p><b>Total:</b> {stats['TOTAL']}</p>
+                <p><b>BUY:</b> {stats['BUY']}</p>
+                <p><b>SELL:</b> {stats['SELL']}</p>
+                <p><b>WAIT:</b> {stats['WAIT']}</p>
             </div>
 
             <div style="margin-top:30px;">
@@ -89,10 +118,10 @@ def run(host: str = "0.0.0.0", port: int = 8000):
 
     server = HTTPServer((host, port), DashboardServer)
 
-    print("=" * 40)
+    print("=" * 50)
     print(" GTI AI DASHBOARD")
-    print("=" * 40)
+    print("=" * 50)
     print(f"Running on http://{host}:{port}")
-    print("=" * 40)
+    print("=" * 50)
 
     server.serve_forever()
