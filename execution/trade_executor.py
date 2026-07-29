@@ -1,50 +1,71 @@
 """
 GTI AI
-Trade Executor
+Trade History
 Version 1.0
 """
 
-from mt5.mt5_connector import MT5Connector
+from __future__ import annotations
+
+from datetime import datetime
 
 
-class TradeExecutor:
+class TradeHistory:
     """
-    Executes trading operations.
+    Stores executed trades in memory.
     """
 
-    def __init__(self):
-        self.connector = MT5Connector()
+    _trades = []
 
-    def execute(
-        self,
-        symbol: str,
-        action: str,
-        volume: float,
-        entry: float,
-        stop_loss: float,
-        take_profit: float,
-    ) -> dict:
+    @classmethod
+    def add(cls, trade: dict) -> None:
         """
-        Placeholder for trade execution.
+        Store a trade record.
         """
 
-        if not self.connector.connect():
-            return {
-                "success": False,
-                "message": "MT5 connection failed.",
-            }
-
-        # Live MT5 order execution will be added later.
-
-        self.connector.disconnect()
-
-        return {
-            "success": True,
-            "message": "Trade execution placeholder completed.",
-            "symbol": symbol,
-            "action": action,
-            "volume": volume,
-            "entry": entry,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
+        record = {
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "symbol": trade.get("symbol", "XAUUSD"),
+            "decision": trade.get("decision", "WAIT"),
+            "entry": trade.get("entry", 0.0),
+            "stop_loss": trade.get("stop_loss", 0.0),
+            "take_profit": trade.get("take_profit", 0.0),
+            "confidence": trade.get("confidence", 0),
+            "status": trade.get("status", "OPEN"),
         }
+
+        cls._trades.append(record)
+
+    @classmethod
+    def all(cls) -> list:
+        """
+        Return all trades.
+        """
+
+        return list(cls._trades)
+
+    @classmethod
+    def latest(cls, limit: int = 10) -> list:
+        """
+        Return the latest trades.
+        """
+
+        if limit <= 0:
+            return []
+
+        return cls._trades[-limit:]
+
+    @classmethod
+    def total(cls) -> int:
+        """
+        Return total number of trades.
+        """
+
+        return len(cls._trades)
+
+    @classmethod
+    def clear(cls) -> None:
+        """
+        Clear trade history.
+        """
+
+        cls._trades.clear()
