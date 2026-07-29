@@ -2,7 +2,7 @@
 """
 GTI AI
 Live Market Scanner
-Version 1.3
+Version 1.4
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from analysis.confluence_analyzer import ConfluenceAnalyzer
 from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
 from mt5.mt5_connector import MT5Connector
 from mt5.multi_timeframe_reader import MultiTimeframeReader
+from notifications.notification_engine import NotificationEngine
 from risk.stop_loss_engine import StopLossEngine
 from risk.take_profit_engine import TakeProfitEngine
 from web.dashboard_server import DashboardServer
@@ -86,7 +87,6 @@ class LiveMarketScanner:
         print("=" * 45)
         print(f"Symbol   : {self.symbol}")
         print(f"Refresh  : {self.interval} seconds")
-        print("Press Ctrl+C to stop.")
         print("=" * 45)
 
         try:
@@ -100,6 +100,8 @@ class LiveMarketScanner:
                 if decision != self.last_signal:
                     self.last_signal = decision
 
+                    NotificationEngine.send(signal)
+
                     print()
                     print("=" * 45)
                     print(" NEW MARKET SIGNAL")
@@ -109,8 +111,13 @@ class LiveMarketScanner:
                     print(f"Entry Price  : {signal['entry']}")
                     print(f"Stop Loss    : {signal['stop_loss']}")
                     print(f"Take Profit  : {signal['take_profit']}")
-                    print(f"Bullish      : {signal['bullish_votes']}")
-                    print(f"Bearish      : {signal['bearish_votes']}")
+
+                    if "bullish_votes" in signal:
+                        print(f"Bullish      : {signal['bullish_votes']}")
+
+                    if "bearish_votes" in signal:
+                        print(f"Bearish      : {signal['bearish_votes']}")
+
                     print("=" * 45)
 
                 else:
