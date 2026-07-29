@@ -1,10 +1,12 @@
 """
 GTI AI
 Position Manager
-Version 1.0
+Version 2.0
 """
 
 from __future__ import annotations
+
+from datetime import datetime
 
 
 class PositionManager:
@@ -20,13 +22,22 @@ class PositionManager:
         Open a new trading position.
         """
 
+        entry = float(trade.get("entry", 0.0))
+
         position = {
             "symbol": trade.get("symbol", "XAUUSD"),
             "decision": trade.get("decision", "WAIT"),
-            "entry": trade.get("entry", 0.0),
-            "stop_loss": trade.get("stop_loss", 0.0),
-            "take_profit": trade.get("take_profit", 0.0),
-            "confidence": trade.get("confidence", 0),
+            "entry": entry,
+            "current_price": entry,
+            "stop_loss": float(trade.get("stop_loss", 0.0)),
+            "take_profit": float(trade.get("take_profit", 0.0)),
+            "lot_size": float(trade.get("lot_size", 0.01)),
+            "confidence": int(trade.get("confidence", 0)),
+            "floating_profit": 0.0,
+            "floating_pips": 0.0,
+            "floating_status": "BREAKEVEN",
+            "opened_at": datetime.now(),
+            "closed_at": None,
             "status": "OPEN",
         }
 
@@ -40,6 +51,7 @@ class PositionManager:
 
         if 0 <= index < len(cls._positions):
             cls._positions[index]["status"] = "CLOSED"
+            cls._positions[index]["closed_at"] = datetime.now()
             return True
 
         return False
@@ -71,6 +83,20 @@ class PositionManager:
         """
 
         return len(cls.open_positions())
+
+    @classmethod
+    def total_profit(cls) -> float:
+        """
+        Return total floating profit.
+        """
+
+        return round(
+            sum(
+                position.get("floating_profit", 0.0)
+                for position in cls.open_positions()
+            ),
+            2,
+        )
 
     @classmethod
     def clear(cls) -> None:
