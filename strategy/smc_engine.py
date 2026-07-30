@@ -1,13 +1,15 @@
 """
 GTI AI
 Smart Money Concepts Engine
-Version 1.0
+Version 2.0
 """
+
+from __future__ import annotations
 
 
 class SMCEngine:
     """
-    Basic Smart Money Concepts analysis.
+    Smart Money Concepts analysis engine.
     """
 
     @staticmethod
@@ -19,10 +21,11 @@ class SMCEngine:
         order_block: bool,
     ) -> dict:
         """
-        Returns SMC score and confirmation.
+        Analyze Smart Money Concept confirmations.
         """
+
         score = 0
-        reasons = []
+        reasons: list[str] = []
 
         if bos:
             score += 20
@@ -44,7 +47,14 @@ class SMCEngine:
             score += 20
             reasons.append("Order Block")
 
+        score = min(score, 100)
+
         return {
+            "bos": bos,
+            "choch": choch,
+            "liquidity": liquidity,
+            "fvg": fvg,
+            "order_block": order_block,
             "score": score,
             "confirmed": score >= 60,
             "reasons": reasons,
