@@ -1,7 +1,7 @@
 """
 GTI AI
 Trading Engine
-Version 3.0
+Version 4.0
 """
 
 from __future__ import annotations
@@ -21,10 +21,11 @@ class TradingEngine:
         ema_aligned: bool,
         smc: dict,
         multi_timeframe_confirmed: bool,
-        news_safe: bool = True,
+        news_safe: bool =True,
+        dxy_signal: str = "NEUTRAL",
     ) -> dict:
         """
-        Generate the final AI trading decision.
+        Generate the final AI trading signal.
         """
 
         confluence = ConfluenceEngine.calculate(
@@ -44,10 +45,32 @@ class TradingEngine:
         if multi_timeframe_confirmed:
             score = min(score + 10, 100)
 
+        trend = trend.upper()
+
+        if dxy_signal == "USD_WEAKNESS":
+            if trend in ("BULLISH", "STRONG_BULLISH"):
+                score = min(score + 10, 100)
+            elif trend in ("BEARISH", "STRONG_BEARISH"):
+                score = max(score - 10, 0)
+
+        elif dxy_signal == "USD_STRENGTH":
+            if trend in ("BEARISH", "STRONG_BEARISH"):
+                score = min(score + 10, 100)
+            elif trend in ("BULLISH", "STRONG_BULLISH"):
+                score = max(score - 10, 0)
+
         decision = DecisionEngine.summary(
             score=score,
             trend=trend,
         )
+
+        reasons = list(confluence["reasons"])
+
+        if dxy_signal == "USD_WEAKNESS":
+            reasons.append("DXY confirms Gold bullish bias")
+
+        elif dxy_signal == "USD_STRENGTH":
+            reasons.append("DXY confirms Gold bearish bias")
 
         return {
             "signal": decision["decision"],
@@ -56,5 +79,6 @@ class TradingEngine:
             "confidence": score,
             "strength": decision["strength"],
             "trade_allowed": decision["trade_allowed"],
-            "reasons": confluence["reasons"],
+            "dxy_signal": dxy_signal,
+            "reasons": reasons,
         }
