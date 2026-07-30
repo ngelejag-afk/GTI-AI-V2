@@ -1,7 +1,7 @@
 """
 GTI AI
 ATR Engine
-Version 1.0
+Version 1.1
 """
 
 from __future__ import annotations
@@ -14,22 +14,20 @@ class ATREngine:
 
     @staticmethod
     def calculate(
-        candles: list[dict],
+        candles: list,
         period: int = 14,
-    ) -> float | None:
+    ) -> float:
         """
         Calculate the latest ATR value.
 
-        Candle format:
-        {
-            "high": float,
-            "low": float,
-            "close": float,
-        }
+        Supports both:
+
+        - Objects with .high/.low/.close
+        - Dictionaries with "high"/"low"/"close"
         """
 
         if len(candles) < period + 1:
-            return None
+            return 0.0
 
         true_ranges: list[float] = []
 
@@ -37,9 +35,14 @@ class ATREngine:
             current = candles[index]
             previous = candles[index - 1]
 
-            high = float(current["high"])
-            low = float(current["low"])
-            previous_close = float(previous["close"])
+            if hasattr(current, "high"):
+                high = float(current.high)
+                low = float(current.low)
+                previous_close = float(previous.close)
+            else:
+                high = float(current["high"])
+                low = float(current["low"])
+                previous_close = float(previous["close"])
 
             true_range = max(
                 high - low,
@@ -51,4 +54,4 @@ class ATREngine:
 
         latest = true_ranges[-period:]
 
-        return sum(latest) / period
+        return round(sum(latest) / period, 2)
