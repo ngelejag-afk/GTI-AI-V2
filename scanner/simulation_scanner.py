@@ -1,7 +1,7 @@
 """
 GTI AI
 Simulation Scanner
-Version 5.0
+Version 5.1
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import time
 
 from analysis.pipeline import AnalysisPipeline
 from execution.signal_adapter import SignalAdapter
+from execution.spread_filter import SpreadFilter
 from execution.trade_executor import TradeExecutor
 from execution.trade_lifecycle_manager import TradeLifecycleManager
 from mt5.market_data_service import MarketDataService
@@ -44,6 +45,8 @@ class SimulationScanner:
             "lot_size": 0.0,
             "risk_amount": 0.0,
             "risk_reward": "1:0",
+            "spread": 0,
+            "spread_ok": False,
         }
 
     def run(self) -> None:
@@ -87,6 +90,19 @@ class SimulationScanner:
                     account_balance=market["account_balance"],
                 )
 
+                spread_check = SpreadFilter.validate(
+                    spread=market["spread"],
+                )
+
+                signal["spread"] = market["spread"]
+                signal["spread_ok"] = spread_check["valid"]
+
+                if not spread_check["valid"]:
+                    signal["trade_allowed"] = False
+
+                    reasons = signal.setdefault("reasons", [])
+                    reasons.append(spread_check["reason"])
+
                 signal["market_bias"] = result["market"]["market_bias"]
 
             DashboardServer.update(signal)
@@ -116,6 +132,11 @@ class SimulationScanner:
             print(f"Risk Amount    : {signal.get('risk_amount', 0.0)}")
             print(f"Risk Reward    : {signal.get('risk_reward', '-')}")
             print(f"ATR            : {market.get('atr', 0.0)}")
+            print(f"Spread         : {market.get('spread', 0)}")
+            print(
+                f"Spread Status  : "
+                f"{'OK' if signal.get('spread_ok', False) else 'BLOCKED'}"
+            )
             print(f"Open Positions : {len(TradeExecutor.open_positions())}")
             print(f"Trade History  : {len(TradeExecutor.trade_history())}")
             print("=" * 60)
