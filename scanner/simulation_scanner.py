@@ -1,7 +1,7 @@
 """
 GTI AI
 Simulation Scanner
-Version 5.1
+Version 5.2
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 
 from analysis.pipeline import AnalysisPipeline
+from execution.session_filter import SessionFilter
 from execution.signal_adapter import SignalAdapter
 from execution.spread_filter import SpreadFilter
 from execution.trade_executor import TradeExecutor
@@ -47,6 +48,8 @@ class SimulationScanner:
             "risk_reward": "1:0",
             "spread": 0,
             "spread_ok": False,
+            "session": "UNKNOWN",
+            "session_ok": False,
         }
 
     def run(self) -> None:
@@ -99,9 +102,20 @@ class SimulationScanner:
 
                 if not spread_check["valid"]:
                     signal["trade_allowed"] = False
+                    signal.setdefault("reasons", []).append(
+                        spread_check["reason"]
+                    )
 
-                    reasons = signal.setdefault("reasons", [])
-                    reasons.append(spread_check["reason"])
+                session_check = SessionFilter.validate()
+
+                signal["session"] = session_check["session"]
+                signal["session_ok"] = session_check["valid"]
+
+                if not session_check["valid"]:
+                    signal["trade_allowed"] = False
+                    signal.setdefault("reasons", []).append(
+                        session_check["reason"]
+                    )
 
                 signal["market_bias"] = result["market"]["market_bias"]
 
@@ -135,7 +149,12 @@ class SimulationScanner:
             print(f"Spread         : {market.get('spread', 0)}")
             print(
                 f"Spread Status  : "
-                f"{'OK' if signal.get('spread_ok', False) else 'BLOCKED'}"
+                f"{'OK' if signal.get('spread_ok') else 'BLOCKED'}"
+            )
+            print(f"Session        : {signal.get('session', 'UNKNOWN')}")
+            print(
+                f"Session Status : "
+                f"{'OK' if signal.get('session_ok') else 'BLOCKED'}"
             )
             print(f"Open Positions : {len(TradeExecutor.open_positions())}")
             print(f"Trade History  : {len(TradeExecutor.trade_history())}")
