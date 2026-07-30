@@ -1,7 +1,7 @@
 """
 GTI AI
 Simulation Scanner
-Version 4.0
+Version 5.0
 """
 
 from __future__ import annotations
@@ -34,12 +34,16 @@ class SimulationScanner:
     @staticmethod
     def _wait_signal() -> dict:
         return {
+            "symbol": "",
             "decision": "WAIT",
             "market_bias": "UNKNOWN",
             "entry": 0.0,
             "stop_loss": 0.0,
             "take_profit": 0.0,
             "confidence": 0,
+            "lot_size": 0.0,
+            "risk_amount": 0.0,
+            "risk_reward": "1:0",
         }
 
     def run(self) -> None:
@@ -77,7 +81,10 @@ class SimulationScanner:
                 signal = SignalAdapter.adapt(
                     ai_signal=result["signal"],
                     symbol=self.symbol,
-                    entry=latest_price,
+                    bid=market["bid"],
+                    ask=market["ask"],
+                    atr=market["atr"],
+                    account_balance=market["account_balance"],
                 )
 
                 signal["market_bias"] = result["market"]["market_bias"]
@@ -89,21 +96,28 @@ class SimulationScanner:
 
                 NotificationEngine.send(signal)
 
-                if signal["decision"] in ("BUY", "SELL"):
+                if (
+                    signal["decision"] in ("BUY", "SELL")
+                    and signal.get("trade_allowed", False)
+                ):
                     TradeExecutor.execute(signal)
 
             print()
-            print("=" * 50)
+            print("=" * 60)
             print(" GTI AI SIGNAL")
-            print("=" * 50)
-            print(f"Decision      : {signal['decision']}")
-            print(f"Confidence    : {signal['confidence']}%")
-            print(f"Trend         : {signal['market_bias']}")
-            print(f"Entry         : {signal['entry']}")
-            print(f"Stop Loss     : {signal['stop_loss']}")
-            print(f"Take Profit   : {signal['take_profit']}")
-            print(f"Open Positions: {len(TradeExecutor.open_positions())}")
-            print(f"Trade History : {len(TradeExecutor.trade_history())}")
-            print("=" * 50)
+            print("=" * 60)
+            print(f"Decision       : {signal['decision']}")
+            print(f"Confidence     : {signal['confidence']}%")
+            print(f"Trend          : {signal.get('market_bias', 'UNKNOWN')}")
+            print(f"Entry          : {signal['entry']}")
+            print(f"Stop Loss      : {signal['stop_loss']}")
+            print(f"Take Profit    : {signal['take_profit']}")
+            print(f"Lot Size       : {signal.get('lot_size', 0.0)}")
+            print(f"Risk Amount    : {signal.get('risk_amount', 0.0)}")
+            print(f"Risk Reward    : {signal.get('risk_reward', '-')}")
+            print(f"ATR            : {market.get('atr', 0.0)}")
+            print(f"Open Positions : {len(TradeExecutor.open_positions())}")
+            print(f"Trade History  : {len(TradeExecutor.trade_history())}")
+            print("=" * 60)
 
             time.sleep(self.interval)
