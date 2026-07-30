@@ -1,7 +1,7 @@
 """
 GTI AI
 Analysis Pipeline
-Version 4.0
+Version 5.0
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 from analysis.dxy_analyzer import DXYAnalyzer
 from analysis.market_analyzer import MarketAnalyzer
 from analysis.multi_timeframe_analyzer import MultiTimeframeAnalyzer
+from analysis.news_analyzer import NewsAnalyzer
 from analysis.smc_analyzer import SMCAnalyzer
 from ai.trading_engine import TradingEngine
 
@@ -24,7 +25,7 @@ class AnalysisPipeline:
         candles: list | None = None,
         timeframes: dict | None = None,
         dxy_prices: list[float] | None = None,
-        news_safe: bool = True,
+        news_events: list[dict] | None = None,
     ) -> dict:
         """
         Analyze market data and generate a trading signal.
@@ -58,12 +59,14 @@ class AnalysisPipeline:
             }
         )
 
+        news = NewsAnalyzer.analyze(news_events)
+
         signal = TradingEngine.generate_signal(
             trend=market["trend"],
             ema_aligned=market["ema_aligned"],
             smc=smc,
             multi_timeframe_confirmed=multi_timeframe["confirmed"],
-            news_safe=news_safe,
+            news_safe=news["safe"],
             dxy_signal=dxy["signal"],
         )
 
@@ -72,5 +75,6 @@ class AnalysisPipeline:
             "multi_timeframe": multi_timeframe,
             "smc": smc,
             "dxy": dxy,
+            "news": news,
             "signal": signal,
         }
