@@ -1,17 +1,20 @@
 """
 GTI AI
 Market Data Service
-Version 2.0
+Version 3.0
 """
 
 from __future__ import annotations
 
+from account.account_info import AccountInfo
+from indicators.atr_engine import ATREngine
 from mt5.multi_timeframe_reader import MultiTimeframeReader
+from mt5.symbol_service import SymbolService
 
 
 class MarketDataService:
     """
-    Provides centralized market data for
+    Provides a centralized market snapshot for
     simulation, paper trading and live trading.
     """
 
@@ -23,7 +26,9 @@ class MarketDataService:
         bars: int = 500,
     ) -> dict:
         """
-        Return market candles, close prices and latest price.
+        Return market candles, prices, ATR and account data.
+
+        Backward compatible with previous versions.
         """
 
         timeframes = MultiTimeframeReader.read(
@@ -41,7 +46,7 @@ class MarketDataService:
             for candle in candles:
                 try:
                     closes.append(float(candle["close"]))
-                except (KeyError, IndexError, TypeError):
+                except (KeyError, TypeError, IndexError):
                     continue
 
             close_prices[timeframe] = closes
@@ -58,9 +63,35 @@ class MarketDataService:
                     latest_price = closes[-1]
                     break
 
+        default_candles = timeframes.get(
+            MarketDataService.DEFAULT_TIMEFRAME,
+            [],
+        )
+
+        atr = ATREngine.calculate(default_candles)
+
+        symbol_info = SymbolService.get(symbol)
+
+        if symbol_info:
+            bid = float(symbol_info["bid"])
+            ask = float(symbol_info["ask"])
+            spread = int(symbol_info["spread"])
+        else:
+            bid = latest_price or 0.0
+            ask = latest_price or 0.0
+            spread = 0
+
+        account = AccountInfo.get()
+
         return {
             "symbol": symbol,
             "timeframes": timeframes,
             "close_prices": close_prices,
             "latest_price": latest_price,
+            "bid": bid,
+            "ask": ask,
+            "spread": spread,
+            "atr": atr,
+            "account_balance": account["balance"],
+            "account": account,
         }
