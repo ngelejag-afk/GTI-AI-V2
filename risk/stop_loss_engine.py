@@ -1,32 +1,50 @@
-
 """
 GTI AI
 Stop Loss Engine
-Version 2.0
+Version 1.0
 """
+
+from __future__ import annotations
 
 
 class StopLossEngine:
     """
-    Calculates Stop Loss using
-    a configurable percentage.
+    Calculates a dynamic stop loss using ATR.
     """
 
     @staticmethod
     def calculate(
-        entry: float,
-        decision: str,
-        risk_percent: float = 0.5,
-    ) -> float:
+        signal: str,
+        entry_price: float,
+        atr: float,
+        multiplier: float = 1.5,
+    ) -> dict:
+        """
+        Calculate the stop loss level.
+        """
 
-        decision = decision.upper()
+        signal = signal.upper()
 
-        distance = entry * (risk_percent / 100)
+        if (
+            signal not in ("BUY", "SELL")
+            or entry_price <= 0
+            or atr <= 0
+        ):
+            return {
+                "stop_loss": None,
+                "risk_distance": None,
+                "valid": False,
+            }
 
-        if decision == "BUY":
-            return round(entry - distance, 2)
+        risk_distance = atr * multiplier
 
-        if decision == "SELL":
-            return round(entry + distance, 2)
+        if signal == "BUY":
+            stop_loss = entry_price - risk_distance
+        else:
+            stop_loss = entry_price + risk_distance
 
-        return round(entry, 2)
+        return {
+            "stop_loss": round(stop_loss, 2),
+            "risk_distance": round(risk_distance, 2),
+            "valid": True,
+        }
