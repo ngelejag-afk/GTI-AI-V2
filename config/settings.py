@@ -1,7 +1,7 @@
 """
 GTI AI
 System Configuration
-Version 1.0
+Version 2.0
 """
 
 
@@ -20,10 +20,16 @@ class Settings:
 
     DEFAULT_BALANCE = 10000.0
 
-    PAPER_TRADING = True
-
-    LIVE_TRADING = False
+    # Trading modes:
+    # PAPER -> Internal paper trading engine
+    # DEMO  -> MetaTrader 5 demo account
+    # LIVE  -> MetaTrader 5 live account
+    TRADING_MODE = "PAPER"
 
     MAGIC_NUMBER = 2026001
 
     JOURNAL_FILE = "trade_history.csv"
+
+    DEFAULT_LOT_SIZE = 0.01
+
+    MAX_SLIPPAGE = 20
