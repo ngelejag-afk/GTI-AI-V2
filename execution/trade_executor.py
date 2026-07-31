@@ -1,14 +1,15 @@
+
 """
 GTI AI
 Trade Executor
-Version 3.0
+Version 4.0
 """
 
 from __future__ import annotations
 
 from analysis.performance_monitor import PerformanceMonitor
+from execution.execution_router import ExecutionRouter
 from execution.order_manager import OrderManager
-from execution.paper_trading_engine import PaperTradingEngine
 from execution.position_manager import PositionManager
 from execution.trade_history import TradeHistory
 from risk.account_risk_manager import AccountRiskManager
@@ -70,21 +71,37 @@ class TradeExecutor:
         PositionManager.open_position(order)
         TradeHistory.add(order)
 
-        paper_trade = PaperTradingEngine.update(
-            order=order,
-            current_price=order["entry"],
-        )
+        execution_result = ExecutionRouter.execute(order)
 
-        if paper_trade["status"] in ("WIN", "LOSS", "BREAKEVEN"):
-            PerformanceMonitor.record(
-                decision=order["decision"],
-                confidence=order["confidence"],
-                result=paper_trade["status"],
+        if not execution_result.get("success", False):
+            print(
+                f"Execution failed: "
+                f"{execution_result.get('message', 'Unknown error')}"
             )
+            return False
+
+        if execution_result.get("mode") == "PAPER":
+            paper_trade = execution_result["result"]
+
+            if paper_trade["status"] in (
+                "WIN",
+                "LOSS",
+                "BREAKEVEN",
+            ):
+                PerformanceMonitor.record(
+                    decision=order["decision"],
+                    confidence=order["confidence"],
+                    result=paper_trade["status"],
+                )
+
+            status = paper_trade["status"]
+        else:
+            status = "SENT_TO_MT5"
 
         print("=" * 50)
         print(" GTI AI TRADE EXECUTED")
         print("=" * 50)
+        print(f"Mode          : {execution_result['mode']}")
         print(f"Symbol        : {order['symbol']}")
         print(f"Decision      : {order['decision']}")
         print(f"Entry         : {order['entry']}")
@@ -93,7 +110,7 @@ class TradeExecutor:
         print(f"Lot Size      : {order['lot_size']}")
         print(f"Risk          : {order['risk_percent']}%")
         print(f"Confidence    : {order['confidence']}%")
-        print(f"Status        : {paper_trade['status']}")
+        print(f"Status        : {status}")
         print("=" * 50)
 
         return True
