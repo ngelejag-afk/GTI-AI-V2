@@ -1,10 +1,12 @@
 """
 GTI AI
 Risk Manager
-Version 1.0
+Version 2.0
 """
 
 from __future__ import annotations
+
+from execution.statistics_engine import StatisticsEngine
 
 
 class RiskManager:
@@ -19,12 +21,28 @@ class RiskManager:
     @staticmethod
     def validate(
         open_trades: int,
-        daily_loss_percent: float,
-        consecutive_losses: int,
+        daily_loss_percent: float | None = None,
+        consecutive_losses: int | None = None,
     ) -> dict:
         """
         Validate whether new trades are allowed.
         """
+
+        stats = StatisticsEngine.summary()
+
+        if consecutive_losses is None:
+            consecutive_losses = stats["consecutive_losses"]
+
+        if daily_loss_percent is None:
+            gross_profit = stats["gross_profit"]
+            gross_loss = stats["gross_loss"]
+
+            if gross_profit == 0:
+                daily_loss_percent = gross_loss
+            else:
+                daily_loss_percent = (
+                    gross_loss / gross_profit
+                ) * 100
 
         if open_trades >= RiskManager.MAX_OPEN_TRADES:
             return {
@@ -50,4 +68,5 @@ class RiskManager:
         return {
             "valid": True,
             "reason": "Risk validation passed.",
+            "statistics": stats,
         }
