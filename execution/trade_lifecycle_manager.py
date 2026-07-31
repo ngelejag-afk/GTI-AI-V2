@@ -1,7 +1,7 @@
 """
 GTI AI
 Trade Lifecycle Manager
-Version 3.0
+Version 3.1
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from account.account_engine import AccountEngine
 from analysis.performance_monitor import PerformanceMonitor
 from execution.paper_trading_engine import PaperTradingEngine
 from execution.profit_loss_engine import ProfitLossEngine
+from execution.statistics_engine import StatisticsEngine
 
 
 class TradeLifecycleManager:
@@ -63,3 +64,21 @@ class TradeLifecycleManager:
                 confidence=position["confidence"],
                 result=result["status"],
             )
+
+            if result["status"] == "WIN":
+                StatisticsEngine.record(
+                    result="WIN",
+                    profit=pnl["profit"],
+                )
+
+            elif result["status"] == "LOSS":
+                StatisticsEngine.record(
+                    result="LOSS",
+                    profit=pnl["profit"],
+                )
+
+            else:
+                StatisticsEngine.record(
+                    result="BREAKEVEN",
+                    profit=0.0,
+                )
