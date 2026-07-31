@@ -1,7 +1,7 @@
 """
 GTI AI
 Trade Lifecycle Manager
-Version 3.1
+Version 3.2
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from analysis.performance_monitor import PerformanceMonitor
 from execution.paper_trading_engine import PaperTradingEngine
 from execution.profit_loss_engine import ProfitLossEngine
 from execution.statistics_engine import StatisticsEngine
+from execution.trade_journal import TradeJournal
 
 
 class TradeLifecycleManager:
@@ -82,3 +83,17 @@ class TradeLifecycleManager:
                     result="BREAKEVEN",
                     profit=0.0,
                 )
+
+            TradeJournal.record(
+                symbol=position.get("symbol", "UNKNOWN"),
+                decision=position["decision"],
+                entry=position["entry"],
+                exit_price=current_price,
+                stop_loss=position.get("stop_loss", 0.0),
+                take_profit=position.get("take_profit", 0.0),
+                lot_size=position.get("lot_size", 0.01),
+                profit=pnl["profit"],
+                pips=pnl["pips"],
+                confidence=position.get("confidence", 0),
+                result=result["status"],
+            )
