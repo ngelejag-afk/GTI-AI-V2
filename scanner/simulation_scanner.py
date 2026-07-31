@@ -1,7 +1,7 @@
 """
 GTI AI
 Simulation Scanner
-Version 5.3
+Version 5.4
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ class SimulationScanner:
             "session": "UNKNOWN",
             "session_ok": False,
             "risk_ok": False,
+            "trade_allowed": False,
         }
 
     def run(self) -> None:
@@ -96,6 +97,7 @@ class SimulationScanner:
                 )
 
                 signal["market_bias"] = result["market"]["market_bias"]
+                signal["trade_allowed"] = True
 
                 spread_check = SpreadFilter.validate(
                     spread=market["spread"],
@@ -125,8 +127,6 @@ class SimulationScanner:
                     open_trades=len(
                         TradeExecutor.open_positions()
                     ),
-                    daily_loss_percent=0.0,
-                    consecutive_losses=0,
                 )
 
                 signal["risk_ok"] = risk_check["valid"]
@@ -178,6 +178,16 @@ class SimulationScanner:
                 f"Risk Status    : "
                 f"{'OK' if signal.get('risk_ok', False) else 'BLOCKED'}"
             )
+            print(
+                f"Trade Allowed  : "
+                f"{'YES' if signal.get('trade_allowed', False) else 'NO'}"
+            )
+
+            if signal.get("reasons"):
+                print("Reasons:")
+                for reason in signal["reasons"]:
+                    print(f"  - {reason}")
+
             print(f"Open Positions : {len(TradeExecutor.open_positions())}")
             print(f"Trade History  : {len(TradeExecutor.trade_history())}")
             print("=" * 60)
