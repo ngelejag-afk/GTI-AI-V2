@@ -1,12 +1,13 @@
 """
 GTI AI
 Dashboard Server
-Version 2.0
+Version 2.1
 """
 
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from execution.statistics_engine import StatisticsEngine
 from web.dashboard_data import DashboardData
 from web.dashboard_history import DashboardHistory
 from web.dashboard_style import DashboardStyle
@@ -49,6 +50,8 @@ class DashboardServer(BaseHTTPRequestHandler):
         positions = data["positions"]
         performance = data["performance"]
 
+        trading_stats = StatisticsEngine.summary()
+
         page = DashboardStyle.html(self.signal)
 
         page = page.replace(
@@ -59,6 +62,20 @@ class DashboardServer(BaseHTTPRequestHandler):
                 <p><b>Entry:</b> {self.signal['entry']}</p>
                 <p><b>Stop Loss:</b> {self.signal['stop_loss']}</p>
                 <p><b>Take Profit:</b> {self.signal['take_profit']}</p>
+            </div>
+
+            <div class="card">
+                <h2>Trading Statistics</h2>
+                <p><b>Total Trades:</b> {trading_stats['total_trades']}</p>
+                <p><b>Wins:</b> {trading_stats['wins']}</p>
+                <p><b>Losses:</b> {trading_stats['losses']}</p>
+                <p><b>Breakeven:</b> {trading_stats['breakeven']}</p>
+                <p><b>Win Rate:</b> {trading_stats['win_rate']}%</p>
+                <p><b>Profit Factor:</b> {trading_stats['profit_factor']}</p>
+                <p><b>Consecutive Wins:</b> {trading_stats['consecutive_wins']}</p>
+                <p><b>Consecutive Losses:</b> {trading_stats['consecutive_losses']}</p>
+                <p><b>Gross Profit:</b> {trading_stats['gross_profit']}</p>
+                <p><b>Gross Loss:</b> {trading_stats['gross_loss']}</p>
             </div>
 
             <div class="card">
