@@ -1,11 +1,12 @@
 """
 GTI AI
 Dashboard Data
-Version 2.0
+Version 2.1
 """
 
 from __future__ import annotations
 
+from analysis.analytics_engine import AnalyticsEngine
 from analysis.performance_dashboard import PerformanceDashboard
 from mt5.account_info import AccountInfo
 from mt5.position_info import PositionInfo
@@ -28,6 +29,7 @@ class DashboardData:
             "statistics": NotificationCenter.statistics(),
             "notifications": NotificationCenter.latest(10),
             "performance": PerformanceDashboard.data(),
+            "analytics": AnalyticsEngine.summary(),
             "account": AccountInfo.get(),
             "positions": PositionInfo.summary(),
         }
