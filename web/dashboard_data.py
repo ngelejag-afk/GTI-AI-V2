@@ -6,8 +6,8 @@ Version 2.1
 
 from __future__ import annotations
 
-from analysis.analytics_engine import AnalyticsEngine
 from analysis.performance_dashboard import PerformanceDashboard
+from execution.statistics_engine import StatisticsEngine
 from mt5.account_info import AccountInfo
 from mt5.position_info import PositionInfo
 from notifications.notification_center import NotificationCenter
@@ -29,7 +29,7 @@ class DashboardData:
             "statistics": NotificationCenter.statistics(),
             "notifications": NotificationCenter.latest(10),
             "performance": PerformanceDashboard.data(),
-            "analytics": AnalyticsEngine.summary(),
+            "trading_statistics": StatisticsEngine.summary(),
             "account": AccountInfo.get(),
             "positions": PositionInfo.summary(),
         }
