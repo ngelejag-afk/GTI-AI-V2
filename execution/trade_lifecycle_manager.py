@@ -1,7 +1,7 @@
 """
 GTI AI
 Trade Lifecycle Manager
-Version 3.2
+Version 4.0
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from execution.trade_journal import TradeJournal
 
 class TradeLifecycleManager:
     """
-    Updates paper trades until they are closed.
+    Updates paper and MT5 trades until they are closed.
     """
 
     @staticmethod
@@ -31,6 +31,13 @@ class TradeLifecycleManager:
         for position in positions:
 
             if position.get("status") != "OPEN":
+                continue
+
+            # MT5 trades are managed by the MT5 terminal.
+            # This manager records their lifecycle once they
+            # are marked as closed by the execution layer.
+            if position.get("ticket") is not None:
+                position["current_price"] = current_price
                 continue
 
             result = PaperTradingEngine.update(
@@ -66,23 +73,10 @@ class TradeLifecycleManager:
                 result=result["status"],
             )
 
-            if result["status"] == "WIN":
-                StatisticsEngine.record(
-                    result="WIN",
-                    profit=pnl["profit"],
-                )
-
-            elif result["status"] == "LOSS":
-                StatisticsEngine.record(
-                    result="LOSS",
-                    profit=pnl["profit"],
-                )
-
-            else:
-                StatisticsEngine.record(
-                    result="BREAKEVEN",
-                    profit=0.0,
-                )
+            StatisticsEngine.record(
+                result=result["status"],
+                profit=pnl["profit"] if result["status"] != "BREAKEVEN" else 0.0,
+            )
 
             TradeJournal.record(
                 symbol=position.get("symbol", "UNKNOWN"),
@@ -97,3 +91,19 @@ class TradeLifecycleManager:
                 confidence=position.get("confidence", 0),
                 result=result["status"],
             )
+
+    @staticmethod
+    def attach_ticket(position: dict, ticket: int) -> None:
+        """
+        Attach an MT5 ticket to a position.
+        """
+
+        position["ticket"] = ticket
+
+    @staticmethod
+    def has_ticket(position: dict) -> bool:
+        """
+        Return whether the position has an MT5 ticket.
+        """
+
+        return position.get("ticket") is not None
