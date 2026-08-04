@@ -22,15 +22,29 @@ class MarketDataService:
         self.account_info = AccountInfo()
 
     @classmethod
-    def get_market_data(cls, symbol: str = "XAUUSD", timeframe: str = "M15", count: int = 100) -> dict:
+    def get_market_data(
+        cls,
+        symbol: str = "XAUUSD",
+        timeframe: str = "M15",
+        count: int = 100,
+    ) -> dict:
         """
         Fetch market data or return mock structure for simulation scanner.
         """
+        # Mock price series kwa ajili ya M15 na timeframes zingine
+        mock_series = [2400.0 + (i * 0.1) for i in range(count)]
+
         return {
             "symbol": symbol,
-            "timeframe": timeframe,
-            "prices": [2400.0 + (i * 0.1) for i in range(count)],
             "status": "active",
+            "close_prices": {
+                "M1": mock_series,
+                "M5": mock_series,
+                "M15": mock_series,
+                "H1": mock_series,
+                "H4": mock_series,
+                "D1": mock_series,
+            },
         }
 
     def get_current_price(self, symbol: str) -> float:
