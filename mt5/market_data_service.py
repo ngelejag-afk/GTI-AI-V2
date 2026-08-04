@@ -31,12 +31,19 @@ class MarketDataService:
         """
         Fetch market data or return mock structure for simulation scanner.
         """
-        # Mock price series kwa ajili ya M15 na timeframes zingine
         mock_series = [2400.0 + (i * 0.1) for i in range(count)]
 
         return {
             "symbol": symbol,
             "status": "active",
+            "timeframes": {
+                "M1": mock_series,
+                "M5": mock_series,
+                "M15": mock_series,
+                "H1": mock_series,
+                "H4": mock_series,
+                "D1": mock_series,
+            },
             "close_prices": {
                 "M1": mock_series,
                 "M5": mock_series,
