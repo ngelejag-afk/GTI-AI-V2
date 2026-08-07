@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 class NotificationHistory:
     def __init__(self, *args, **kwargs):
@@ -22,7 +23,6 @@ Notification History
 Version 1.0
 """
 
-from __future__ import annotations
 
 from collections import deque
 
