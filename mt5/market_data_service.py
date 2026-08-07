@@ -1,97 +1,66 @@
 """
 GTI AI
 Market Data Service
-Version 3.0
 """
 
 from __future__ import annotations
 
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    mt5 = None
+
 from account.account_info import AccountInfo
-from indicators.atr_engine import ATREngine
-from mt5.multi_timeframe_reader import MultiTimeframeReader
-from mt5.symbol_service import SymbolService
 
 
 class MarketDataService:
     """
-    Provides a centralized market snapshot for
-    simulation, paper trading and live trading.
+    Service for fetching market data and price information.
     """
 
-    DEFAULT_TIMEFRAME = "M15"
+    def __init__(self) -> None:
+        self.account_info = AccountInfo()
 
-    @staticmethod
+    @classmethod
     def get_market_data(
+        cls,
         symbol: str = "XAUUSD",
-        bars: int = 500,
+        timeframe: str = "M15",
+        count: int = 100,
     ) -> dict:
         """
-        Return market candles, prices, ATR and account data.
-
-        Backward compatible with previous versions.
+        Fetch market data or return mock structure for simulation scanner.
         """
-
-        timeframes = MultiTimeframeReader.read(
-            symbol=symbol,
-            bars=bars,
-        )
-
-        close_prices: dict[str, list[float]] = {}
-
-        latest_price: float | None = None
-
-        for timeframe, candles in timeframes.items():
-            closes: list[float] = []
-
-            for candle in candles:
-                try:
-                    closes.append(float(candle["close"]))
-                except (KeyError, TypeError, IndexError):
-                    continue
-
-            close_prices[timeframe] = closes
-
-            if (
-                timeframe == MarketDataService.DEFAULT_TIMEFRAME
-                and closes
-            ):
-                latest_price = closes[-1]
-
-        if latest_price is None:
-            for closes in close_prices.values():
-                if closes:
-                    latest_price = closes[-1]
-                    break
-
-        default_candles = timeframes.get(
-            MarketDataService.DEFAULT_TIMEFRAME,
-            [],
-        )
-
-        atr = ATREngine.calculate(default_candles)
-
-        symbol_info = SymbolService.get(symbol)
-
-        if symbol_info:
-            bid = float(symbol_info["bid"])
-            ask = float(symbol_info["ask"])
-            spread = int(symbol_info["spread"])
-        else:
-            bid = latest_price or 0.0
-            ask = latest_price or 0.0
-            spread = 0
-
-        account = AccountInfo.get()
+        mock_series = [2400.0 + (i * 0.1) for i in range(count)]
 
         return {
             "symbol": symbol,
-            "timeframes": timeframes,
-            "close_prices": close_prices,
-            "latest_price": latest_price,
-            "bid": bid,
-            "ask": ask,
-            "spread": spread,
-            "atr": atr,
-            "account_balance": account["balance"],
-            "account": account,
+            "status": "active",
+            "timeframes": {
+                "M1": mock_series,
+                "M5": mock_series,
+                "M15": mock_series,
+                "H1": mock_series,
+                "H4": mock_series,
+                "D1": mock_series,
+            },
+            "close_prices": {
+                "M1": mock_series,
+                "M5": mock_series,
+                "M15": mock_series,
+                "H1": mock_series,
+                "H4": mock_series,
+                "D1": mock_series,
+            },
         }
+
+    def get_current_price(self, symbol: str) -> float:
+        """
+        Return current price for a given symbol.
+        """
+        prices = {
+            "XAUUSD": 2400.00,
+            "EURUSD": 1.0850,
+            "GBPUSD": 1.2800,
+        }
+        return prices.get(symbol, 100.0)

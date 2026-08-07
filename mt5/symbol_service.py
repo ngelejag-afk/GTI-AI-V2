@@ -1,6 +1,7 @@
 try:
     import MetaTrader5 as mt5
 except ImportError:
+<<<<<<< HEAD
     mt5 = None
 
 class SymbolService:
@@ -21,3 +22,14 @@ class SymbolService:
             "point": 0.01,
             "spread": 50
         }
+=======
+    # Fallback/Mock object kwa ajili ya cloud/Linux deployment (Render)
+    class DummyMT5:
+        def initialize(self):
+            return True
+
+        def shutdown(self):
+            pass
+
+    mt5 = DummyMT5()
+>>>>>>> d610a44e6bfc6e0716955509ea7641ff7a01cd80

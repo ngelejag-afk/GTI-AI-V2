@@ -1,8 +1,14 @@
 import requests
 import urllib.parse
 
+<<<<<<< HEAD
 PHONE_NUMBER = "255754203511"
 API_KEY = "API_KEY_YAKO_HAPA"  # Weka API Key ya CallMeBot hapa
+=======
+# Weka namba yako ya simu na API Key hapa
+PHONE_NUMBER = "+255XXXXXXXXX"  # Badilisha na namba yako (mfano: +255712345678)
+API_KEY = "123456"              # Badilisha na API Key ulizopata kutoka CallMeBot
+>>>>>>> d610a44e6bfc6e0716955509ea7641ff7a01cd80
 
 def send_whatsapp_test():
     message = (
@@ -14,6 +20,7 @@ def send_whatsapp_test():
         "🎯 *Take Profit:* 2420.00\n\n"
         "✅ *Status:* Connection Successful!"
     )
+<<<<<<< HEAD
 
     encoded_message = urllib.parse.quote(message)
     url = f"https://api.callmebot.com/whatsapp.php?phone={PHONE_NUMBER}&text={encoded_message}&apikey={API_KEY}"
@@ -29,3 +36,21 @@ def send_whatsapp_test():
 
 if __name__ == "__main__":
     send_whatsapp_test()
+=======
+    
+    encoded_message = urllib.parse.quote(message)
+    url = f"https://api.callmebot.com/whatsapp.php?phone={PHONE_NUMBER}&text={encoded_message}&apikey={API_KEY}"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            print("Ujumbe umetumwa kikamilifu kwenye WhatsApp Business yako!")
+        else:
+            print(f"Imefeli: {response.text}")
+    except Exception as e:
+        print(f"Hitilafu kwenye mtandao: {e}")
+
+if __name__ == "__main__":
+    send_whatsapp_test()
+
+>>>>>>> d610a44e6bfc6e0716955509ea7641ff7a01cd80
