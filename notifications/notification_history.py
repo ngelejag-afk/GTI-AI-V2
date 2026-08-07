@@ -1,5 +1,4 @@
 
-<<<<<<< HEAD
 class NotificationHistory:
     def __init__(self, *args, **kwargs):
         pass
@@ -17,7 +16,6 @@ class NotificationHistory:
     @classmethod
     def get_all(cls, *args, **kwargs):
         return []
-=======
 """
 GTI AI
 Notification History

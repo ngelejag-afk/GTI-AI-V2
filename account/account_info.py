@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 class AccountInfo:
     def __init__(self, *args, **kwargs):
         self.balance = 10000.0
@@ -20,7 +19,6 @@ class AccountInfo:
     @classmethod
     def get(cls, *args, **kwargs):
         return cls()
-=======
 """
 GTI AI
 Account Info Module
@@ -50,4 +48,3 @@ class AccountInfo:
     def get_summary(cls) -> dict:
         return AccountEngine.summary()
 
->>>>>>> d610a44e6bfc6e0716955509ea7641ff7a01cd80

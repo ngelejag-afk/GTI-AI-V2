@@ -1,11 +1,9 @@
-<<<<<<< HEAD
 class PositionSizingEngine:
     def __init__(self, *args, **kwargs):
         pass
 
     def calculate_position_size(self, *args, **kwargs):
         return 0.01
-=======
 
 """
 GTI AI
@@ -53,4 +51,3 @@ class PositionSizingEngine:
             "risk_amount": round(risk_amount, 2),
             "valid": True,
         }
->>>>>>> d610a44e6bfc6e0716955509ea7641ff7a01cd80
