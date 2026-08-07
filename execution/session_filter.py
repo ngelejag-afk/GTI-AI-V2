@@ -5,14 +5,12 @@ Session Filter
 Version 1.0
 """
 
-
 from datetime import datetime, timezone
-
+from config.settings import Settings
 
 class SessionFilter:
     """
-    Validates whether trading is allowed during
-    the configured trading sessions.
+    Validates whether trading is allowed during the configured trading sessions.
     """
 
     LONDON_OPEN = 7
@@ -23,24 +21,18 @@ class SessionFilter:
 
     @staticmethod
     def validate() -> dict:
-        """
-        Validate whether the current UTC time is
-        inside the supported trading sessions.
-        """
-
         hour = datetime.now(timezone.utc).hour
 
-        london = (
-            SessionFilter.LONDON_OPEN
-            <= hour
-            < SessionFilter.LONDON_CLOSE
-        )
+        if getattr(Settings, "ALLOW_ALL_SESSIONS", False):
+            return {
+                "valid": True,
+                "session": "ACTIVE_OVERRIDE",
+                "hour": hour,
+                "reason": "Session filter bypassed by override setting.",
+            }
 
-        new_york = (
-            SessionFilter.NEW_YORK_OPEN
-            <= hour
-            < SessionFilter.NEW_YORK_CLOSE
-        )
+        london = SessionFilter.LONDON_OPEN <= hour < SessionFilter.LONDON_CLOSE
+        new_york = SessionFilter.NEW_YORK_OPEN <= hour < SessionFilter.NEW_YORK_CLOSE
 
         valid = london or new_york
 
