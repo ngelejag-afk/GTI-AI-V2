@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Account Risk Manager
 Version 1.0
 """
 
-from __future__ import annotations
 
 from risk.lot_size_engine import LotSizeEngine
 

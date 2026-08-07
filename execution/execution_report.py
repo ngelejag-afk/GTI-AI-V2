@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Execution Report
 Version 1.0
 """
 
-from __future__ import annotations
 
 from analysis.performance_monitor import PerformanceMonitor
 from execution.position_manager import PositionManager

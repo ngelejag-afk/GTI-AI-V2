@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 System Status
 Version 1.0
 """
 
-from __future__ import annotations
 
 from analysis.performance_dashboard import PerformanceDashboard
 from notifications.notification_center import NotificationCenter

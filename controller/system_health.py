@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 System Health Monitor
 Version 1.0
 """
 
-from __future__ import annotations
 
 from analysis.performance_dashboard import PerformanceDashboard
 from controller.system_status import SystemStatus

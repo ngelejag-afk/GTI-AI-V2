@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 MT5 Account Information
 Version 2.0
 """
 
-from __future__ import annotations
 
 from account.account_engine import AccountEngine
 

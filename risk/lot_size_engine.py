@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 """
 GTI AI
@@ -5,7 +6,6 @@ Lot Size Engine
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class LotSizeEngine:

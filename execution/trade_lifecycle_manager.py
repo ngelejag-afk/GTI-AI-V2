@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Trade Lifecycle Manager
 Version 4.0
 """
 
-from __future__ import annotations
 
 from account.account_engine import AccountEngine
 from analysis.performance_monitor import PerformanceMonitor

@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Performance Dashboard
 Version 1.0
 """
 
-from __future__ import annotations
 
 from analysis.performance_monitor import PerformanceMonitor
 

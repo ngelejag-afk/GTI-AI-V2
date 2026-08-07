@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Simulation Scanner
 Version 5.4
 """
 
-from __future__ import annotations
 
 import time
 

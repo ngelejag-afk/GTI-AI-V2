@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Decision Engine
 Version 3.0
 """
 
-from __future__ import annotations
 
 
 class DecisionEngine:

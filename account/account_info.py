@@ -1,3 +1,4 @@
+from __future__ import annotations
 class AccountInfo:
     def __init__(self, *args, **kwargs):
         self.balance = 10000.0
@@ -24,7 +25,6 @@ GTI AI
 Account Info Module
 """
 
-from __future__ import annotations
 from account.account_engine import AccountEngine
 
 

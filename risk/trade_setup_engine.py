@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Trade Setup Engine
 Version 1.0
 """
 
-from __future__ import annotations
 
 from risk.entry_price_engine import EntryPriceEngine
 from risk.position_sizing_engine import PositionSizingEngine

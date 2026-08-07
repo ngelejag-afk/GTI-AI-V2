@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Stop Loss Engine
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class StopLossEngine:

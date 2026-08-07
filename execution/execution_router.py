@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Execution Router
 Version 1.0
 """
 
-from __future__ import annotations
 
 from config.settings import Settings
 from execution.mt5_trade_executor import MT5TradeExecutor

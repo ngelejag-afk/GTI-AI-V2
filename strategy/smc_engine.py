@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Smart Money Concepts Engine
 Version 2.0
 """
 
-from __future__ import annotations
 
 
 class SMCEngine:

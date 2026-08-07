@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 MT5 Candle Reader
 Version 1.0
 """
 
-from __future__ import annotations
 
 from typing import List
 

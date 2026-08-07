@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Daily Loss Guard
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class DailyLossGuard:

@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Signal Adapter
 Version 2.0
 """
 
-from __future__ import annotations
 
 from risk.trade_setup_engine import TradeSetupEngine
 

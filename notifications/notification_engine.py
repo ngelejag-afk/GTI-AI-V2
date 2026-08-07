@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Notification Engine
 Version 3.0
 """
 
-from __future__ import annotations
 
 from notifications.notification_history import NotificationHistory
 

@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 MT5 Position Information
 Version 1.0
 """
 
-from __future__ import annotations
 
 try:
     import MetaTrader5 as mt5

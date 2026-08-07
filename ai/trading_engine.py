@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Trading Engine
 Version 4.0
 """
 
-from __future__ import annotations
 
 from ai.confluence_engine import ConfluenceEngine
 from ai.decision_engine import DecisionEngine

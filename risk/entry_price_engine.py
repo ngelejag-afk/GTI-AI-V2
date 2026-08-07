@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Entry Price Engine
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class EntryPriceEngine:

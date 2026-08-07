@@ -1,3 +1,4 @@
+from __future__ import annotations
 class PositionSizingEngine:
     def __init__(self, *args, **kwargs):
         pass
@@ -11,7 +12,6 @@ Position Sizing Engine
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class PositionSizingEngine:

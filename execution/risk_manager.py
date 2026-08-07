@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Risk Manager
 Version 2.0
 """
 
-from __future__ import annotations
 
 from execution.statistics_engine import StatisticsEngine
 

@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Dashboard Data
 Version 2.1
 """
 
-from __future__ import annotations
 
 from analysis.performance_dashboard import PerformanceDashboard
 from execution.statistics_engine import StatisticsEngine

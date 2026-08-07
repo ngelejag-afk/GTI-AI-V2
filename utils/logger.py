@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Logging Utility
 Version 1.0
 """
 
-from __future__ import annotations
 
 import logging
 from pathlib import Path

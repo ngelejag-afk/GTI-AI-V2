@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Analytics Engine
 Version 1.0
 """
 
-from __future__ import annotations
 
 import csv
 from pathlib import Path

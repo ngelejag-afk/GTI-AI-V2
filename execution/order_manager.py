@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Order Manager
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class OrderManager:

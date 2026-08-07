@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Simulation Test Runner
 Version 1.0
 """
 
-from __future__ import annotations
 
 from analysis.performance_monitor import PerformanceMonitor
 from execution.simulation_engine import SimulationEngine

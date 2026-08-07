@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Trade History
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class TradeHistory:

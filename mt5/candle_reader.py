@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 """
 GTI AI
@@ -5,7 +6,6 @@ Candle Reader
 Version 2.0
 """
 
-from __future__ import annotations
 
 from mt5.mt5_connector import MT5Connector
 

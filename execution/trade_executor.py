@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 """
 GTI AI
@@ -5,7 +6,6 @@ Trade Executor
 Version 4.0
 """
 
-from __future__ import annotations
 
 from analysis.performance_monitor import PerformanceMonitor
 from execution.execution_router import ExecutionRouter

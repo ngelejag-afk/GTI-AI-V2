@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Main Entry Point
 Version 3.0
 """
 
-from __future__ import annotations
 
 from controller.gti_controller import GTIController
 

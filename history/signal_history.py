@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Signal History
 Version 1.0
 """
 
-from __future__ import annotations
 
 from datetime import datetime
 from typing import Any

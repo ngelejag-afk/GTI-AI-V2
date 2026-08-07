@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 """
 GTI AI
@@ -5,7 +6,6 @@ Spread Filter
 Version 1.0
 """
 
-from __future__ import annotations
 
 
 class SpreadFilter:

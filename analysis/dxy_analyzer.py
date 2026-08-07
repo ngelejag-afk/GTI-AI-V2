@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 DXY Analyzer
 Version 1.0
 """
 
-from __future__ import annotations
 
 from analysis.market_analyzer import MarketAnalyzer
 

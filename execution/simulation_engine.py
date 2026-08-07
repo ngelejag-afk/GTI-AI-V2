@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Simulation Engine
 Version 1.0
 """
 
-from __future__ import annotations
 
 from datetime import datetime
 

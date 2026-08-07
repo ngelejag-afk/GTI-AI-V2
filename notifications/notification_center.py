@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 Notification Center
 Version 1.0
 """
 
-from __future__ import annotations
 
 from collections import Counter
 

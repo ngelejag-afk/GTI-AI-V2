@@ -1,10 +1,10 @@
+from __future__ import annotations
 """
 GTI AI
 ATR Engine
 Version 1.1
 """
 
-from __future__ import annotations
 
 
 class ATREngine:

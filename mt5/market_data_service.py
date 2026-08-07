@@ -1,9 +1,9 @@
+from __future__ import annotations
 """
 GTI AI
 Market Data Service
 """
 
-from __future__ import annotations
 
 try:
     import MetaTrader5 as mt5
