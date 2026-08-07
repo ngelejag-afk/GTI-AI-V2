@@ -1,3 +1,4 @@
+
 <<<<<<< HEAD
 class NotificationHistory:
     def __init__(self, *args, **kwargs):
