@@ -57,4 +57,4 @@ class NotificationHistory:
     @classmethod
     def count(cls) -> int:
         return len(cls._history)
->>>>>>> d610a44e6bfc6e0716955509ea7641ff7a01cd80
+
