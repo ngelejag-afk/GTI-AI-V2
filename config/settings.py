@@ -18,7 +18,7 @@ class Settings:
 
     ATR_MULTIPLIER = 1.5
 
-    DEFAULT_BALANCE = 10000.0
+    DEFAULT_BALANCE = 12.92
 
     # Trading modes:
     # PAPER -> Internal paper trading engine
