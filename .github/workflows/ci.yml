@@ -29,6 +29,10 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install pytest pytest-cov
 
+      - name: Clean up malformed test files
+        run: |
+          rm -f test_whatsapp.pytest_whatsapp.py
+
       - name: Run Pytest Suite
         run: |
-          PYTHONPATH=. pytest
+          PYTHONPATH=. pytest --import-mode=importlib
