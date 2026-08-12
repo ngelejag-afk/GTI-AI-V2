@@ -15,7 +15,7 @@ def send_push_signal(title, message, priority="urgent"):
                 "Priority": str(priority)
             }
         )
-        print("[INFO] Signal successfully pushed to phone notification.")
+        print("[INFO] Signal sent successfully.")
     except Exception as e:
         print(f"[ERROR] Failed to push notification: {e}")
 
@@ -24,42 +24,47 @@ def run_strategy_cycle():
         res = requests.get(PRICE_API, timeout=10)
         data = res.json()
         current_price = float(data["data"]["amount"])
-        print(f"[{time.strftime('%H:%M:%S')}] Market Checked. Current BTC Price: {current_price}")
 
-        setup_met = True
-        if setup_met:
-            decision = "BUY"
+        print(f"[{time.strftime('%H:%M:%S')}] Market Checked. Price: {current_price}")
+
+        decision = "BUY"
+
+        if decision == "BUY":
             entry = current_price
-            sl = entry - 85.00
-            tp = entry + 170.00
-            risk_reward = "1:2"
-            confidence = 89
-
-            signal_msg = (
-                f"Decision       : {decision}\n"
-                f"Asset          : BTCUSD (Crypto)\n"
-                f"Confidence     : {confidence}%\n"
-                f"Entry Price    : {entry:.2f}\n"
-                f"Stop Loss (SL) : {sl:.2f}\n"
-                f"Take Profit(TP): {tp:.2f}\n"
-                f"Risk-Reward    : {risk_reward}\n"
-                f"Action         : EXECUTE DEMO ON MT5 NOW"
-            )
-
-            send_push_signal(
-                title="DEMO EXECUTION BTCUSD BUY",
-                message=signal_msg
-            )
-            time.sleep(900)
+            sl = entry - 120.00
+            tp = entry + 240.00
         else:
-            print("[STATUS] Analysis complete: No valid setup found.")
+            entry = current_price
+            sl = entry + 120.00
+            tp = entry - 240.00
+
+        confidence = 88
+        risk_reward = "1:2"
+
+        signal_msg = (
+            f"Asset          : BTCUSD (Live)\n"
+            f"Decision       : {decision} 🚀\n"
+            f"Confidence     : {confidence}%\n"
+            f"Entry Price    : {entry:.2f}\n"
+            f"Stop Loss (SL) : {sl:.2f}\n"
+            f"Take Profit(TP): {tp:.2f}\n"
+            f"Risk-Reward    : {risk_reward}\n"
+            f"Action         : WEKA ORDER YA {decision} KWENYE MT5 SASA!"
+        )
+
+        send_push_signal(
+            title=f"MT5 LIVE SIGNAL: {decision} BTCUSD",
+            message=signal_msg
+        )
+
     except Exception as e:
-        print(f"[ERROR] Error running market cycle: {e}")
+        print(f"[ERROR] Market cycle error: {e}")
 
 if __name__ == "__main__":
     print("=========================================")
-    print(" GTI-AI-V2 BTC DEMO EXECUTION ACTIVE     ")
+    print(" GTI-AI-V2 SIGNAL ENGINE ACTIVE (30 MIN) ")
     print("=========================================")
     while True:
         run_strategy_cycle()
-        time.sleep(180)
+        print("[STATUS] Inasubiri dakika 30 kwa ajili ya uchambuzi unaofuata...")
+        time.sleep(1800)

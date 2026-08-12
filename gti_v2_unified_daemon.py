@@ -99,7 +99,7 @@ class SignalStateMachine:
 
         if self.last_signal_direction is None:
             return None
-        return self.last_signal_direction.value
+        return (self.last_signal_direction.value if hasattr(self.last_signal_direction, 'value') else self.last_signal_direction) if self.last_signal_direction else None
 
     def save(self) -> None:
         """Persist the state-machine state."""
@@ -109,7 +109,7 @@ class SignalStateMachine:
         data = {
             "state": self.state.value,
             "last_signal_direction": (
-                self.last_signal_direction.value
+                (self.last_signal_direction.value if hasattr(self.last_signal_direction, 'value') else self.last_signal_direction) if self.last_signal_direction else None
                 if self.last_signal_direction is not None
                 else None
             ),
@@ -181,7 +181,7 @@ class SignalStateMachine:
             )
 
         self.state = SignalState.ALERT_SENT
-        self.last_signal_direction = signal.direction
+        self.last_signal_direction = Direction(signal.direction.upper()) if isinstance(signal.direction, str) else signal.direction
         self.last_entry_price = signal.entry
         self.last_stop_price = signal.stop
         self.last_target_price = signal.target
