@@ -4,64 +4,42 @@ Market Analyzer
 Version 2.0
 """
 
-from indicators.ema_engine import EMAEngine
-from strategy.trend_engine import TrendEngine
+from typing import Sequence
+
+from strategy.domain.models import Candle
+from strategy.domain.trend_engine import TrendEngine
 
 
 class MarketAnalyzer:
-    """
-    Performs market analysis using EMA and trend detection.
-    """
+    """Performs market analysis using domain trend detection."""
 
     @staticmethod
-    def analyze(prices: list[float]) -> dict:
-        """
-        Analyze market conditions.
-        """
+    def analyze(candles: Sequence[Candle]) -> dict:
+        """Analyze market conditions from closed candles."""
+        candles = candles or []
 
-        if not prices:
+        if not candles:
             return {
-                "ema20": None,
-                "ema50": None,
-                "ema200": None,
-                "trend": "UNKNOWN",
+                "trend": TrendEngine.INSUFFICIENT_DATA,
                 "ema_aligned": False,
                 "market_bias": "NEUTRAL",
             }
 
-        ema20 = EMAEngine.latest(prices, 20)
-        ema50 = EMAEngine.latest(prices, 50)
-        ema200 = EMAEngine.latest(prices, 200)
+        trend = TrendEngine.analyze(candles)
 
-        trend = TrendEngine.analyze(prices)
+        ema_aligned = trend in {
+            TrendEngine.BULLISH,
+            TrendEngine.BEARISH,
+        }
 
-        bullish_alignment = (
-            ema20 is not None
-            and ema50 is not None
-            and ema200 is not None
-            and ema20 > ema50 > ema200
-        )
-
-        bearish_alignment = (
-            ema20 is not None
-            and ema50 is not None
-            and ema200 is not None
-            and ema20 < ema50 < ema200
-        )
-
-        ema_aligned = bullish_alignment or bearish_alignment
-
-        if bullish_alignment:
+        if trend == TrendEngine.BULLISH:
             market_bias = "BULLISH"
-        elif bearish_alignment:
+        elif trend == TrendEngine.BEARISH:
             market_bias = "BEARISH"
         else:
             market_bias = "NEUTRAL"
 
         return {
-            "ema20": ema20,
-            "ema50": ema50,
-            "ema200": ema200,
             "trend": trend,
             "ema_aligned": ema_aligned,
             "market_bias": market_bias,

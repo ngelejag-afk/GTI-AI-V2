@@ -13,6 +13,10 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import requests
 
+from models.news_event import NewsEvent
+from news.news_service import NewsService
+from gti_c_mtf_news_trade_audit import audit_c_mtf_news_trades
+
 
 CANDLE_API = (
     "https://api.exchange.coinbase.com/"
@@ -74,17 +78,6 @@ class Candle:
     low: float
     close: float
     volume: float
-
-
-@dataclass(frozen=True)
-class NewsEvent:
-    timestamp: int
-    currency: str
-    impact: str
-    title: str
-    actual: Optional[str]
-    forecast: Optional[str]
-    previous: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -662,152 +655,6 @@ def parse_timestamp(value: object) -> Optional[int]:
 
     return None
 
-
-def normalize_news_item(
-    item: Dict[str, object],
-) -> Optional[NewsEvent]:
-    timestamp = parse_timestamp(
-        item.get("date")
-        or item.get("timestamp")
-    )
-
-    if timestamp is None:
-        return None
-
-    currency = str(
-        item.get("currency", "")
-    ).upper().strip()
-
-    impact = str(
-        item.get("impact", "")
-    ).strip()
-
-    title = str(
-        item.get("title")
-        or item.get("event")
-        or ""
-    ).strip()
-
-    if not currency or not title:
-        return None
-
-    return NewsEvent(
-        timestamp=timestamp,
-        currency=currency,
-        impact=impact,
-        title=title,
-        actual=(
-            str(item["actual"])
-            if item.get("actual") is not None
-            else None
-        ),
-        forecast=(
-            str(item["forecast"])
-            if item.get("forecast") is not None
-            else None
-        ),
-        previous=(
-            str(item["previous"])
-            if item.get("previous") is not None
-            else None
-        ),
-    )
-
-
-def parse_news_payload(
-    payload: object,
-) -> List[NewsEvent]:
-    if isinstance(payload, dict):
-        if "events" in payload:
-            payload = payload["events"]
-        elif "calendar" in payload:
-            payload = payload["calendar"]
-        else:
-            payload = [payload]
-
-    if not isinstance(payload, list):
-        raise ValueError(
-            "Unsupported news JSON structure."
-        )
-
-    events: List[NewsEvent] = []
-
-    for item in payload:
-        if not isinstance(item, dict):
-            continue
-
-        event = normalize_news_item(item)
-
-        if event is not None:
-            events.append(event)
-
-    return sorted(
-        events,
-        key=lambda event: event.timestamp,
-    )
-
-
-def load_news_file(
-    filename: str,
-) -> List[NewsEvent]:
-    path = Path(filename)
-
-    if not path.exists():
-        raise FileNotFoundError(
-            f"News file does not exist: {filename}"
-        )
-
-    if path.suffix.lower() == ".csv":
-        return load_news_csv(path)
-
-    with path.open(
-        "r",
-        encoding="utf-8",
-    ) as file:
-        payload = json.load(file)
-
-    return parse_news_payload(payload)
-
-
-def load_news_csv(
-    path: Path,
-) -> List[NewsEvent]:
-    events: List[NewsEvent] = []
-
-    with path.open(
-        "r",
-        encoding="utf-8-sig",
-        newline="",
-    ) as file:
-        reader = csv.DictReader(file)
-
-        for row in reader:
-            item: Dict[str, object] = {
-                "date": row.get("date"),
-                "currency": row.get("currency"),
-                "impact": row.get("impact"),
-                "title": (
-                    row.get("event")
-                    or row.get("title")
-                ),
-                "actual": row.get("actual"),
-                "forecast": row.get("forecast"),
-                "previous": row.get("previous"),
-            }
-
-            event = normalize_news_item(
-                item
-            )
-
-            if event is not None:
-                events.append(event)
-
-    return sorted(
-        events,
-        key=lambda event: event.timestamp,
-    )
-
-
 def news_category(
     score: int,
 ) -> str:
@@ -909,30 +756,49 @@ def get_m15_signal(
     market: PreparedMarket,
     m15_index: int,
 ) -> Optional[Signal]:
+    """Return a signal when the latest M15 candle creates an EMA crossover."""
+
     if m15_index < 1:
+        print(
+            f"[SIGNAL DEBUG] Rejected: m15_index={m15_index}; "
+            "need at least one previous M15 candle."
+        )
         return None
 
     if m15_index >= len(market.m15):
+        print(
+            f"[SIGNAL DEBUG] Rejected: m15_index={m15_index} is outside "
+            f"M15 candle range 0..{len(market.m15) - 1}."
+        )
         return None
 
     current = market.m15[m15_index]
     previous = market.m15[m15_index - 1]
 
-    current_fast = market.m15_states[
-        m15_index
-    ].ema20
+    current_state = market.m15_states[m15_index]
+    previous_state = market.m15_states[m15_index - 1]
 
-    current_slow = market.m15_states[
-        m15_index
-    ].ema50
+    current_fast = current_state.ema20
+    current_slow = current_state.ema50
+    previous_fast = previous_state.ema20
+    previous_slow = previous_state.ema50
 
-    previous_fast = market.m15_states[
-        m15_index - 1
-    ].ema20
-
-    previous_slow = market.m15_states[
-        m15_index - 1
-    ].ema50
+    print(
+        "[SIGNAL DEBUG] "
+        f"index={m15_index} "
+        f"previous_ts={previous.timestamp} "
+        f"current_ts={current.timestamp}"
+    )
+    print(
+        "[SIGNAL DEBUG] "
+        f"previous EMA20={previous_fast} "
+        f"EMA50={previous_slow}"
+    )
+    print(
+        "[SIGNAL DEBUG] "
+        f"current EMA20={current_fast} "
+        f"EMA50={current_slow}"
+    )
 
     if (
         current_fast is None
@@ -940,9 +806,10 @@ def get_m15_signal(
         or previous_fast is None
         or previous_slow is None
     ):
+        print(
+            "[SIGNAL DEBUG] Rejected: one or more EMA values are unavailable."
+        )
         return None
-
-    direction: Optional[str] = None
 
     bullish_cross = (
         previous_fast <= previous_slow
@@ -954,26 +821,50 @@ def get_m15_signal(
         and current_fast < current_slow
     )
 
+    print(
+        "[SIGNAL DEBUG] "
+        f"bullish_cross={bullish_cross} "
+        f"bearish_cross={bearish_cross}"
+    )
+
+    direction: Optional[str] = None
+
     if bullish_cross:
         direction = "BUY"
-
     elif bearish_cross:
         direction = "SELL"
 
     if direction is None:
+        relationship_before = (
+            "above"
+            if previous_fast > previous_slow
+            else "below"
+            if previous_fast < previous_slow
+            else "equal"
+        )
+        relationship_now = (
+            "above"
+            if current_fast > current_slow
+            else "below"
+            if current_fast < current_slow
+            else "equal"
+        )
+
+        print(
+            "[SIGNAL DEBUG] No crossover: "
+            f"EMA20 was {relationship_before} EMA50 and is now "
+            f"{relationship_now} EMA50."
+        )
         return None
 
-    decision_timestamp = (
-        current.timestamp
-        + M15_SECONDS
-    )
+    decision_timestamp = current.timestamp + M15_SECONDS
 
     mtf = build_mtf_state(
         market,
         decision_timestamp,
     )
 
-    return Signal(
+    signal = Signal(
         timestamp=decision_timestamp,
         direction=direction,
         score=mtf.alignment_score,
@@ -986,6 +877,14 @@ def get_m15_signal(
         ),
     )
 
+    print(
+        "[SIGNAL DEBUG] SIGNAL CREATED: "
+        f"direction={signal.direction} "
+        f"timestamp={signal.timestamp} "
+        f"score={signal.score}"
+    )
+
+    return signal
 
 def apply_news_to_signal(
     signal: Signal,
@@ -1009,19 +908,21 @@ def strategy_allows_signal(
     signal: Signal,
     strategy: str,
 ) -> bool:
+    """Return whether a strategy permits the supplied signal."""
     if strategy not in SUPPORTED_STRATEGIES:
         raise ValueError(
             f"Unsupported strategy: {strategy}"
         )
 
+    if signal.direction == "BUY":
+        direction_sign = 1
+    elif signal.direction == "SELL":
+        direction_sign = -1
+    else:
+        return False
+
     if strategy == "A_TECH_ONLY":
         return True
-
-    direction_sign = (
-        1
-        if signal.direction == "BUY"
-        else -1
-    )
 
     if strategy in (
         "B_MTF_ONLY",
@@ -1029,6 +930,7 @@ def strategy_allows_signal(
     ):
         h1 = signal.mtf.h1.trend
         h4 = signal.mtf.h4.trend
+        d1 = signal.mtf.d1.trend
 
         required = (
             "BULLISH"
@@ -1036,18 +938,14 @@ def strategy_allows_signal(
             else "BEARISH"
         )
 
-        if h1 != required or h4 != required:
+        if h1 != required or h4 != required or d1 != required:
             return False
 
     if strategy == "C_MTF_NEWS":
-        if (
-            signal.news.score
-            >= NEWS_BLOCK_THRESHOLD
-        ):
+        if signal.news.score >= NEWS_BLOCK_THRESHOLD:
             return False
 
     return True
-
 
 def find_m5_index_at_or_after(
     market: PreparedMarket,
@@ -1428,38 +1326,60 @@ def print_performance(
     )
 
 
+
+def select_strategy_from_training(
+    reports: Dict[str, Performance],
+) -> str:
+    """Select one strategy using TRAIN-period performance only.
+
+    Strategies without trades are excluded. The primary criterion is
+    expectancy per trade, followed by total net R and lower drawdown.
+    """
+    eligible = [
+        report
+        for report in reports.values()
+        if report.trades > 0
+    ]
+
+    if not eligible:
+        raise ValueError(
+            "No supported strategy produced any training trades."
+        )
+
+    selected = max(
+        eligible,
+        key=lambda report: (
+            report.expectancy_r,
+            report.net_r,
+            -report.max_drawdown_r,
+        ),
+    )
+
+    if selected.expectancy_r <= 0:
+        return None
+
+    return selected.strategy
+
 def build_walk_forward_windows(
     start_timestamp: int,
     end_timestamp: int,
     train_days: int,
     test_days: int,
 ) -> List[WalkForwardWindow]:
-    train_seconds = (
-        train_days * 86400
-    )
-
-    test_seconds = (
-        test_days * 86400
-    )
+    """Build rolling windows using historical data before each test period."""
+    train_seconds = train_days * 86400
+    test_seconds = test_days * 86400
 
     windows: List[WalkForwardWindow] = []
-
-    cursor = (
-        start_timestamp
-        + train_seconds
-    )
+    cursor = start_timestamp
 
     while cursor + test_seconds <= end_timestamp:
         windows.append(
             WalkForwardWindow(
-                train_start=(
-                    cursor - train_seconds
-                ),
+                train_start=cursor - train_seconds,
                 train_end=cursor,
                 test_start=cursor,
-                test_end=(
-                    cursor + test_seconds
-                ),
+                test_end=cursor + test_seconds,
             )
         )
 
@@ -1476,6 +1396,12 @@ def run_walk_forward(
     train_days: int,
     test_days: int,
 ) -> Dict[str, List[TradeRecord]]:
+    """Run genuine walk-forward strategy selection.
+
+    Every window evaluates all supported strategies using TRAIN data only,
+    selects exactly one strategy from those TRAIN metrics, and evaluates only
+    that selected strategy on the subsequent unseen TEST period.
+    """
     windows = build_walk_forward_windows(
         start_timestamp,
         end_timestamp,
@@ -1489,29 +1415,17 @@ def run_walk_forward(
             "walk-forward train/test windows."
         )
 
-    out_of_sample: Dict[
-        str,
-        List[TradeRecord]
-    ] = {
+    out_of_sample: Dict[str, List[TradeRecord]] = {
         strategy: []
         for strategy in SUPPORTED_STRATEGIES
     }
 
     print()
-    print(
-        "========================================="
-    )
-    print(
-        " WALK-FORWARD VALIDATION"
-    )
-    print(
-        "========================================="
-    )
+    print("=" * 60)
+    print(" GENUINE WALK-FORWARD VALIDATION")
+    print("=" * 60)
 
-    for number, window in enumerate(
-        windows,
-        start=1,
-    ):
+    for number, window in enumerate(windows, start=1):
         train_start = datetime.fromtimestamp(
             window.train_start,
             timezone.utc,
@@ -1535,37 +1449,96 @@ def run_walk_forward(
         print()
         print(
             f"Window {number}: "
-            f"TRAIN {train_start} → {train_end} | "
-            f"TEST {test_start} → {test_end}"
+            f"TRAIN {train_start} -> {train_end} | "
+            f"TEST {test_start} -> {test_end}"
         )
 
+        training_reports: Dict[str, Performance] = {}
+
+        print()
+        print("  TRAINING RESULTS")
+
         for strategy in SUPPORTED_STRATEGIES:
-            test_trades = run_strategy(
+            train_trades = run_strategy(
                 market=market,
                 events=events,
                 strategy=strategy,
-                start_timestamp=window.test_start,
-                end_timestamp=window.test_end,
+                start_timestamp=window.train_start,
+                end_timestamp=window.train_end,
             )
-
-            out_of_sample[
-                strategy
-            ].extend(test_trades)
 
             report = performance(
                 strategy,
-                test_trades,
+                train_trades,
             )
+
+            training_reports[strategy] = report
+
+            if math.isinf(report.profit_factor):
+                profit_factor = "INF"
+            else:
+                profit_factor = f"{report.profit_factor:.2f}"
 
             print(
-                f"  {strategy}: "
+                f"    {strategy}: "
                 f"{report.trades} trades | "
                 f"{report.win_rate:.1f}% WR | "
-                f"{report.net_r:.2f}R"
+                f"{report.net_r:.2f}R | "
+                f"{report.expectancy_r:.4f}R exp | "
+                f"PF {profit_factor} | "
+                f"DD {report.max_drawdown_r:.2f}R"
             )
 
-    return out_of_sample
+        selected_strategy = select_strategy_from_training(
+            training_reports
+        )
 
+        print()
+
+        if selected_strategy is None:
+            print(
+                "  SELECTED FROM TRAIN: NO_TRADE "
+                "(no strategy had positive expectancy)"
+            )
+            continue
+
+        selected_train_report = training_reports[selected_strategy]
+
+        print(
+            f"  SELECTED FROM TRAIN: {selected_strategy}"
+        )
+        print(
+            f"  TRAIN EXPECTANCY: "
+            f"{selected_train_report.expectancy_r:.4f}R"
+        )
+
+        test_trades = run_strategy(
+            market=market,
+            events=events,
+            strategy=selected_strategy,
+            start_timestamp=window.test_start,
+            end_timestamp=window.test_end,
+        )
+
+        out_of_sample[selected_strategy].extend(test_trades)
+
+        test_report = performance(
+            selected_strategy,
+            test_trades,
+        )
+
+        print()
+        print("  UNSEEN TEST RESULT")
+        print(
+            f"    {selected_strategy}: "
+            f"{test_report.trades} trades | "
+            f"{test_report.win_rate:.1f}% WR | "
+            f"{test_report.net_r:.2f}R | "
+            f"{test_report.expectancy_r:.4f}R exp | "
+            f"DD {test_report.max_drawdown_r:.2f}R"
+        )
+
+    return out_of_sample
 
 def save_trades(
     filename: str,
@@ -1792,7 +1765,7 @@ def main() -> None:
             "[3/5] Loading historical news..."
         )
 
-        news_events = load_news_file(
+        news_events = NewsService.load_file(
             args.news_file
         )
 
@@ -1825,6 +1798,12 @@ def main() -> None:
         end_timestamp=oos_end,
         train_days=args.walk_forward_train,
         test_days=args.walk_forward_test,
+    )
+
+    audit_c_mtf_news_trades(
+        results["C_MTF_NEWS"],
+        strategy="C_MTF_NEWS",
+        news_block_threshold=NEWS_BLOCK_THRESHOLD,
     )
 
     print()

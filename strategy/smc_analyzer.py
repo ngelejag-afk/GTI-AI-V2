@@ -1,37 +1,40 @@
 """
 GTI AI
 SMC Analyzer
-Version 1.0
+Version 3.0
 """
 
-from strategy.bos_engine import BOSEngine
-from strategy.choch_engine import CHOCHEngine
-from strategy.fvg_engine import FVGEngine
-from strategy.liquidity_sweep_engine import LiquiditySweepEngine
-from strategy.order_block_engine import OrderBlockEngine
+from typing import Sequence
+
+from strategy.domain.models import Candle
+from strategy.domain.structure_pipeline import StructurePipeline
 from strategy.smc_engine import SMCEngine
 
 
 class SMCAnalyzer:
-    """
-    Runs Smart Money Concepts analysis.
-    """
+    """Performs Smart Money Concepts analysis."""
 
     @staticmethod
-    def analyze(candles: list) -> dict:
-        """
-        Returns Smart Money Concepts analysis.
-        """
-        bos = BOSEngine.bullish(candles)
-        choch = CHOCHEngine.bullish(candles)
-        liquidity = LiquiditySweepEngine.buy_side(candles)
-        fvg = FVGEngine.bullish(candles)
-        order_block = OrderBlockEngine.bullish(candles)
+    def analyze(candles: Sequence[Candle]) -> dict:
+        """Analyze SMC conditions from closed candles."""
+        candles = candles or []
+
+        structure = StructurePipeline.analyze(candles)
+
+        bos = (
+            structure.bos != "INSUFFICIENT_DATA"
+            and bool(structure.bos)
+        )
+
+        choch = (
+            structure.choch != "INSUFFICIENT_DATA"
+            and bool(structure.choch)
+        )
 
         return SMCEngine.analyze(
             bos=bos,
             choch=choch,
-            liquidity=liquidity,
-            fvg=fvg,
-            order_block=order_block,
+            liquidity=False,
+            fvg=False,
+            order_block=False,
         )

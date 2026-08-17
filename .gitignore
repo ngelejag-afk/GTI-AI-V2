@@ -3,3 +3,9 @@ __pycache__/
 .env
 venv/
 .venv/
+
+gti_daemon.log
+gti_daemon.pid
+gti_m5_cache.json
+data/gti_v2.db
+.env.ntfy
