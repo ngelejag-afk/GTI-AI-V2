@@ -1,144 +1,384 @@
-"""
-GTI AI
-Dashboard Server
-Version 2.1
-"""
+import os
+import json
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-from execution.statistics_engine import StatisticsEngine
-from web.dashboard_data import DashboardData
-from web.dashboard_history import DashboardHistory
-from web.dashboard_style import DashboardStyle
+HOST = "0.0.0.0"
+PORT = int(os.environ.get("PORT", "8000"))
+SIGNAL_INGEST_TOKEN = os.environ.get("SIGNAL_INGEST_TOKEN", "").strip()
 
 
-class DashboardServer(BaseHTTPRequestHandler):
-    """
-    GTI AI Dashboard Server.
-    """
-
+class DashboardState:
     signal = {
+        "symbol": "XAUUSD",
         "decision": "WAIT",
-        "confidence": 0,
-        "trend": "Unknown",
+        "direction": "WAIT",
+        "confidence": 0.0,
+        "market_bias": "Unknown",
         "entry": 0.0,
         "stop_loss": 0.0,
         "take_profit": 0.0,
-        "updated": "--:--:--",
+        "timestamp": None,
+        "updated": "--:--:-- UTC",
     }
 
-    @classmethod
-    def update(cls, signal: dict) -> None:
-        cls.signal = {
-            "decision": signal.get("decision", "WAIT"),
-            "confidence": signal.get("confidence", 0),
-            "trend": signal.get("market_bias", "Unknown"),
-            "entry": signal.get("entry", 0.0),
-            "stop_loss": signal.get("stop_loss", 0.0),
-            "take_profit": signal.get("take_profit", 0.0),
-            "updated": datetime.now().strftime("%H:%M:%S"),
-        }
 
-        DashboardHistory.add(cls.signal)
+class DashboardServer(BaseHTTPRequestHandler):
 
-    def do_GET(self):
-        data = DashboardData.build(self.signal)
+    def log_message(self, fmt, *args):
+        print(f"[HTTP] {self.address_string()} {fmt % args}")
 
-        stats = data["statistics"]
-        account = data["account"]
-        positions = data["positions"]
-        performance = data["performance"]
+    def send_json(self, data, status=200):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
-        trading_stats = StatisticsEngine.summary()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
-        page = DashboardStyle.html(self.signal)
-
-        page = page.replace(
-            "</body>",
-            f"""
-            <div class="card">
-                <h2>Trade Levels</h2>
-                <p><b>Entry:</b> {self.signal['entry']}</p>
-                <p><b>Stop Loss:</b> {self.signal['stop_loss']}</p>
-                <p><b>Take Profit:</b> {self.signal['take_profit']}</p>
-            </div>
-
-            <div class="card">
-                <h2>Trading Statistics</h2>
-                <p><b>Total Trades:</b> {trading_stats['total_trades']}</p>
-                <p><b>Wins:</b> {trading_stats['wins']}</p>
-                <p><b>Losses:</b> {trading_stats['losses']}</p>
-                <p><b>Breakeven:</b> {trading_stats['breakeven']}</p>
-                <p><b>Win Rate:</b> {trading_stats['win_rate']}%</p>
-                <p><b>Profit Factor:</b> {trading_stats['profit_factor']}</p>
-                <p><b>Consecutive Wins:</b> {trading_stats['consecutive_wins']}</p>
-                <p><b>Consecutive Losses:</b> {trading_stats['consecutive_losses']}</p>
-                <p><b>Gross Profit:</b> {trading_stats['gross_profit']}</p>
-                <p><b>Gross Loss:</b> {trading_stats['gross_loss']}</p>
-            </div>
-
-            <div class="card">
-                <h2>AI Performance</h2>
-                <p><b>Total Trades:</b> {performance['total_trades']}</p>
-                <p><b>Wins:</b> {performance['wins']}</p>
-                <p><b>Losses:</b> {performance['losses']}</p>
-                <p><b>Breakeven:</b> {performance['breakeven']}</p>
-                <p><b>Win Rate:</b> {performance['win_rate']}%</p>
-                <p><b>Average Confidence:</b> {performance['average_confidence']}%</p>
-            </div>
-
-            <div class="card">
-                <h2>Account</h2>
-                <p><b>Connected:</b> {account['connected']}</p>
-                <p><b>Balance:</b> {account['balance']}</p>
-                <p><b>Equity:</b> {account['equity']}</p>
-                <p><b>Free Margin:</b> {account['free_margin']}</p>
-                <p><b>Leverage:</b> {account['leverage']}</p>
-            </div>
-
-            <div class="card">
-                <h2>Open Positions</h2>
-                <p><b>Total:</b> {positions['total_positions']}</p>
-                <p><b>BUY:</b> {positions['buy_positions']}</p>
-                <p><b>SELL:</b> {positions['sell_positions']}</p>
-                <p><b>Floating P/L:</b> {positions['floating_profit']}</p>
-            </div>
-
-            <div class="card">
-                <h2>Signal Statistics</h2>
-                <p><b>Total:</b> {stats['TOTAL']}</p>
-                <p><b>BUY:</b> {stats['BUY']}</p>
-                <p><b>SELL:</b> {stats['SELL']}</p>
-                <p><b>WAIT:</b> {stats['WAIT']}</p>
-            </div>
-
-            <div style="margin-top:30px;">
-                <h2>Recent Signals</h2>
-                {DashboardHistory.html()}
-            </div>
-
-            </body>
-            """,
-        )
+    def send_html(self, html):
+        body = html.encode("utf-8")
 
         self.send_response(200)
-        self.send_header("Content-type", "text/html")
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(page.encode())
+        self.wfile.write(body)
+
+    def do_GET(self):
+
+        if self.path == "/health":
+            self.send_json({
+                "status": "ok",
+                "service": "GTI-AI-V2 Dashboard",
+                "signal_token": "CONFIGURED" if SIGNAL_INGEST_TOKEN else "NOT_CONFIGURED",
+                "updated": DashboardState.signal["updated"]
+            })
+            return
+
+        if self.path == "/api/signal":
+            self.send_json(DashboardState.signal)
+            return
+
+        if self.path != "/":
+            self.send_json({
+                "ok": False,
+                "error": "Not Found"
+            }, 404)
+            return
+
+        s = DashboardState.signal
+        decision = s["decision"]
+
+        if decision == "BUY":
+            decision_color = "#00E676"
+        elif decision == "SELL":
+            decision_color = "#FF1744"
+        else:
+            decision_color = "#FFD600"
+
+        confidence = max(0.0, min(100.0, float(s["confidence"])))
+
+        html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="5">
+<title>GTI-AI-V2 LIVE DASHBOARD</title>
+
+<style>
+body {{
+    background:#101010;
+    color:white;
+    font-family:Arial,sans-serif;
+    padding:20px;
+}}
+
+.card {{
+    background:#1d1d1d;
+    padding:20px;
+    border-radius:15px;
+    margin-bottom:20px;
+}}
+
+.decision {{
+    font-size:48px;
+    font-weight:bold;
+    text-align:center;
+    color:{decision_color};
+}}
+
+.value {{
+    font-size:25px;
+}}
+
+.signal {{
+    font-size:30px;
+    font-weight:bold;
+}}
+
+table {{
+    width:100%;
+}}
+
+td {{
+    padding:8px;
+}}
+</style>
+</head>
+
+<body>
+
+<h1>🤖 GTI-AI-V2 LIVE DASHBOARD</h1>
+
+<div class="card">
+<h2>Decision</h2>
+<div class="decision">{decision}</div>
+</div>
+
+<div class="card">
+<h2>Symbol</h2>
+<div class="signal">{s["symbol"]}</div>
+</div>
+
+<div class="card">
+<h2>Confidence</h2>
+
+<div style="
+width:100%;
+background:#333;
+border-radius:10px;
+overflow:hidden;
+height:25px;
+">
+
+<div style="
+width:{confidence}%;
+background:{decision_color};
+height:25px;
+text-align:center;
+font-weight:bold;
+">
+
+{confidence:.1f}%
+
+</div>
+</div>
+</div>
+
+<div class="card">
+<h2>Market Bias</h2>
+<div class="value">{s["market_bias"]}</div>
+</div>
+
+<div class="card">
+<h2>Trade Levels</h2>
+
+<table>
+<tr>
+<td><b>Entry</b></td>
+<td>{s["entry"]:.2f}</td>
+</tr>
+
+<tr>
+<td><b>Stop Loss</b></td>
+<td>{s["stop_loss"]:.2f}</td>
+</tr>
+
+<tr>
+<td><b>Take Profit</b></td>
+<td>{s["take_profit"]:.2f}</td>
+</tr>
+</table>
+</div>
+
+<div class="card">
+<h2>Direction</h2>
+<div class="value">{s["direction"]}</div>
+</div>
+
+<div class="card">
+<h2>Last Updated</h2>
+<div class="value">{s["updated"]}</div>
+</div>
+
+<div class="card">
+<h2>System</h2>
+
+<p><b>Signal Engine:</b> TERMUX</p>
+<p><b>MT5 Execution:</b> DISABLED</p>
+<p><b>Dashboard:</b> RENDER</p>
+<p><b>Auto Refresh:</b> 5 seconds</p>
+<p><b>Signal API:</b> ONLINE</p>
+
+</div>
+
+</body>
+</html>
+"""
+
+        self.send_html(html)
+
+    def do_POST(self):
+
+        if self.path != "/api/signal":
+            self.send_json({
+                "ok": False,
+                "error": "Not Found"
+            }, 404)
+            return
+
+        if not SIGNAL_INGEST_TOKEN:
+            self.send_json({
+                "ok": False,
+                "error": "SIGNAL_INGEST_TOKEN is not configured on Render"
+            }, 503)
+            return
+
+        received_token = self.headers.get("X-Signal-Token", "")
+
+        if received_token != SIGNAL_INGEST_TOKEN:
+            self.send_json({
+                "ok": False,
+                "error": "Unauthorized"
+            }, 401)
+            return
+
+        try:
+            content_length = int(
+                self.headers.get("Content-Length", "0")
+            )
+
+            if content_length <= 0:
+                raise ValueError("Empty request body")
+
+            raw_body = self.rfile.read(content_length)
+            data = json.loads(raw_body.decode("utf-8"))
+
+            now = datetime.now(timezone.utc)
+
+            decision = str(
+                data.get("decision", "WAIT")
+            ).upper()
+
+            direction = str(
+                data.get(
+                    "direction",
+                    decision
+                )
+            ).upper()
+
+            DashboardState.signal = {
+                "symbol": data.get(
+                    "symbol",
+                    "XAUUSD"
+                ),
+
+                "decision": decision,
+
+                "direction": direction,
+
+                "confidence": float(
+                    data.get(
+                        "confidence",
+                        0
+                    )
+                ),
+
+                "market_bias": data.get(
+                    "market_bias",
+                    data.get(
+                        "trend",
+                        "Unknown"
+                    )
+                ),
+
+                "entry": float(
+                    data.get(
+                        "entry",
+                        0
+                    )
+                ),
+
+                "stop_loss": float(
+                    data.get(
+                        "stop_loss",
+                        0
+                    )
+                ),
+
+                "take_profit": float(
+                    data.get(
+                        "take_profit",
+                        0
+                    )
+                ),
+
+                "timestamp": int(
+                    now.timestamp()
+                ),
+
+                "updated": now.strftime(
+                    "%Y-%m-%d %H:%M:%S UTC"
+                )
+            }
+
+            print(
+                "[SIGNAL UPDATE]",
+                json.dumps(
+                    DashboardState.signal,
+                    ensure_ascii=False
+                )
+            )
+
+            self.send_json({
+                "ok": True,
+                "message": "Signal updated",
+                "signal": DashboardState.signal
+            })
+
+        except Exception as exc:
+
+            print(f"[POST ERROR] {exc}")
+
+            self.send_json({
+                "ok": False,
+                "error": str(exc)
+            }, 400)
 
 
-def run(host: str = "0.0.0.0", port: int = 8000):
-    """
-    Start the dashboard server.
-    """
+def run():
 
-    server = HTTPServer((host, port), DashboardServer)
+    print("=" * 60)
+    print("GTI-AI-V2 DASHBOARD SERVER")
+    print("=" * 60)
+    print(f"HOST : {HOST}")
+    print(f"PORT : {PORT}")
+    print(
+        "SIGNAL TOKEN : "
+        + (
+            "CONFIGURED"
+            if SIGNAL_INGEST_TOKEN
+            else "NOT CONFIGURED"
+        )
+    )
+    print("=" * 60)
 
-    print("=" * 50)
-    print(" GTI AI DASHBOARD")
-    print("=" * 50)
-    print(f"Running on http://{host}:{port}")
-    print("=" * 50)
+    server = ThreadingHTTPServer(
+        (HOST, PORT),
+        DashboardServer
+    )
+
+    print(
+        f"[+] Dashboard listening on port {PORT}"
+    )
 
     server.serve_forever()
+
+
+if __name__ == "__main__":
+    run()
