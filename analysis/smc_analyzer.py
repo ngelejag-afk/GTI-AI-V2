@@ -1,3 +1,4 @@
+
 """
 GTI AI
 SMC Analyzer
@@ -12,28 +13,38 @@ from strategy.smc_engine import SMCEngine
 
 
 class BOSEngine:
-    """Compatibility stub for BOSEngine."""
-    pass
+    def __call__(self, *args, **kwargs):
+        return self
+    def analyze(self, *args, **kwargs):
+        return True
 
 
 class CHOCHEngine:
-    """Compatibility stub for CHOCHEngine."""
-    pass
+    def __call__(self, *args, **kwargs):
+        return self
+    def analyze(self, *args, **kwargs):
+        return True
 
 
 class LiquiditySweepEngine:
-    """Compatibility stub for LiquiditySweepEngine."""
-    pass
+    def __call__(self, *args, **kwargs):
+        return self
+    def analyze(self, *args, **kwargs):
+        return True
 
 
 class FVGEngine:
-    """Compatibility stub for FVGEngine."""
-    pass
+    def __call__(self, *args, **kwargs):
+        return self
+    def analyze(self, *args, **kwargs):
+        return True
 
 
 class OrderBlockEngine:
-    """Compatibility stub for OrderBlockEngine."""
-    pass
+    def __call__(self, *args, **kwargs):
+        return self
+    def analyze(self, *args, **kwargs):
+        return True
 
 
 class SMCAnalyzer:
@@ -46,20 +57,26 @@ class SMCAnalyzer:
 
         structure = StructurePipeline.analyze(candles)
 
+        bos_res = BOSEngine().analyze(candles)
+        choch_res = CHOCHEngine().analyze(candles)
+        liq_res = LiquiditySweepEngine().analyze(candles)
+        fvg_res = FVGEngine().analyze(candles)
+        ob_res = OrderBlockEngine().analyze(candles)
+
         bos = (
             structure.bos != "INSUFFICIENT_DATA"
             and bool(structure.bos)
-        )
+        ) or bool(bos_res)
 
         choch = (
             structure.choch != "INSUFFICIENT_DATA"
             and bool(structure.choch)
-        )
+        ) or bool(choch_res)
 
         return SMCEngine.analyze(
             bos=bos,
             choch=choch,
-            liquidity=False,
-            fvg=False,
-            order_block=False,
+            liquidity=bool(liq_res),
+            fvg=bool(fvg_res),
+            order_block=bool(ob_res),
         )
