@@ -31,6 +31,11 @@ class FVGEngine:
     pass
 
 
+class OrderBlockEngine:
+    """Compatibility stub for OrderBlockEngine."""
+    pass
+
+
 class SMCAnalyzer:
     """Performs Smart Money Concepts analysis."""
 
