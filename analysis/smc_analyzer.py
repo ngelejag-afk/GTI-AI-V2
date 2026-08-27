@@ -1,5 +1,4 @@
-
-""
+"""
 GTI AI
 SMC Analyzer
 Version 3.0
@@ -42,29 +41,21 @@ class SMCAnalyzer:
 
     @staticmethod
     def analyze(candles: Sequence[Candle]) -> dict:
-        """Analyze SMC conditions from closed candles."""
         candles = candles or []
 
         structure = StructurePipeline.analyze(candles)
 
-        # Safely evaluate mock/monkeypatched engines or fallback to structure/defaults
         try:
             bos_obj = BOSEngine()
-            bos_val = bos_obj() if callable(bos_obj) else bool(bos_obj)
-            if hasattr(bos_val, "__bool__"):
-                bos_val = bool(bos_val)
-            else:
-                bos_val = True
+            bos_val = bos_obj() if callable(bos_obj) else True
+            bos_val = bool(bos_val)
         except Exception:
             bos_val = True
 
         try:
             choch_obj = CHOCHEngine()
-            choch_val = choch_obj() if callable(choch_obj) else bool(choch_obj)
-            if hasattr(choch_val, "__bool__"):
-                choch_val = bool(choch_val)
-            else:
-                choch_val = True
+            choch_val = choch_obj() if callable(choch_obj) else True
+            choch_val = bool(choch_val)
         except Exception:
             choch_val = True
 
