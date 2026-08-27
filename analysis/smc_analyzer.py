@@ -16,6 +16,11 @@ class BOSEngine:
     pass
 
 
+class CHOCHEngine:
+    """Compatibility stub for CHOCHEngine."""
+    pass
+
+
 class SMCAnalyzer:
     """Performs Smart Money Concepts analysis."""
 
