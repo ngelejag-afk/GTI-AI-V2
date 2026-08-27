@@ -12,28 +12,38 @@ from strategy.smc_engine import SMCEngine
 
 
 class BOSEngine:
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, is_active=True):
+        self.is_active = is_active
+    def __call__(self, *args, **kwargs):
+        return self.is_active
 
 
 class CHOCHEngine:
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, is_active=True):
+        self.is_active = is_active
+    def __call__(self, *args, **kwargs):
+        return self.is_active
 
 
 class LiquiditySweepEngine:
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, is_active=False):
+        self.is_active = is_active
+    def __call__(self, *args, **kwargs):
+        return self.is_active
 
 
 class FVGEngine:
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, is_active=False):
+        self.is_active = is_active
+    def __call__(self, *args, **kwargs):
+        return self.is_active
 
 
 class OrderBlockEngine:
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, is_active=False):
+        self.is_active = is_active
+    def __call__(self, *args, **kwargs):
+        return self.is_active
 
 
 class SMCAnalyzer:
@@ -45,40 +55,25 @@ class SMCAnalyzer:
 
         structure = StructurePipeline.analyze(candles)
 
-        try:
-            bos_obj = BOSEngine()
-            bos_val = bos_obj() if callable(bos_obj) else True
-            bos_val = bool(bos_val)
-        except Exception:
-            bos_val = True
+        def evaluate_engine(engine_cls, default_val):
+            try:
+                obj = engine_cls()
+                if hasattr(obj, "is_active"):
+                    return bool(obj.is_active)
+                if callable(obj):
+                    res = obj()
+                    if hasattr(res, "is_active"):
+                        return bool(res.is_active)
+                    return bool(res)
+                return bool(obj)
+            except Exception:
+                return default_val
 
-        try:
-            choch_obj = CHOCHEngine()
-            choch_val = choch_obj() if callable(choch_obj) else True
-            choch_val = bool(choch_val)
-        except Exception:
-            choch_val = True
-
-        try:
-            liq_obj = LiquiditySweepEngine()
-            liq_val = liq_obj() if callable(liq_obj) else False
-            liq_val = bool(liq_val)
-        except Exception:
-            liq_val = False
-
-        try:
-            fvg_obj = FVGEngine()
-            fvg_val = fvg_obj() if callable(fvg_obj) else False
-            fvg_val = bool(fvg_val)
-        except Exception:
-            fvg_val = False
-
-        try:
-            ob_obj = OrderBlockEngine()
-            ob_val = ob_obj() if callable(ob_obj) else False
-            ob_val = bool(ob_val)
-        except Exception:
-            ob_val = False
+        bos_val = evaluate_engine(BOSEngine, True)
+        choch_val = evaluate_engine(CHOCHEngine, True)
+        liq_val = evaluate_engine(LiquiditySweepEngine, False)
+        fvg_val = evaluate_engine(FVGEngine, False)
+        ob_val = evaluate_engine(OrderBlockEngine, False)
 
         bos = (
             structure.bos != "INSUFFICIENT_DATA"
