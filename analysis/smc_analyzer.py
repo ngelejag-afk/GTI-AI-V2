@@ -11,6 +11,11 @@ from strategy.domain.structure_pipeline import StructurePipeline
 from strategy.smc_engine import SMCEngine
 
 
+class BOSEngine:
+    """Compatibility stub for BOSEngine."""
+    pass
+
+
 class SMCAnalyzer:
     """Performs Smart Money Concepts analysis."""
 
