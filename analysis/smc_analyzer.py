@@ -21,6 +21,11 @@ class CHOCHEngine:
     pass
 
 
+class LiquiditySweepEngine:
+    """Compatibility stub for LiquiditySweepEngine."""
+    pass
+
+
 class SMCAnalyzer:
     """Performs Smart Money Concepts analysis."""
 
