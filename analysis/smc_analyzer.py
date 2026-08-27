@@ -26,6 +26,11 @@ class LiquiditySweepEngine:
     pass
 
 
+class FVGEngine:
+    """Compatibility stub for FVGEngine."""
+    pass
+
+
 class SMCAnalyzer:
     """Performs Smart Money Concepts analysis."""
 
