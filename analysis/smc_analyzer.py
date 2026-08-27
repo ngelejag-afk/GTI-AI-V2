@@ -1,4 +1,3 @@
-
 """
 GTI AI
 SMC Analyzer
@@ -14,36 +13,26 @@ from strategy.smc_engine import SMCEngine
 
 class BOSEngine:
     def __call__(self, *args, **kwargs):
-        return self
-    def analyze(self, *args, **kwargs):
         return True
 
 
 class CHOCHEngine:
     def __call__(self, *args, **kwargs):
-        return self
-    def analyze(self, *args, **kwargs):
         return True
 
 
 class LiquiditySweepEngine:
     def __call__(self, *args, **kwargs):
-        return self
-    def analyze(self, *args, **kwargs):
         return True
 
 
 class FVGEngine:
     def __call__(self, *args, **kwargs):
-        return self
-    def analyze(self, *args, **kwargs):
         return True
 
 
 class OrderBlockEngine:
     def __call__(self, *args, **kwargs):
-        return self
-    def analyze(self, *args, **kwargs):
         return True
 
 
@@ -57,11 +46,30 @@ class SMCAnalyzer:
 
         structure = StructurePipeline.analyze(candles)
 
-        bos_res = BOSEngine().analyze(candles)
-        choch_res = CHOCHEngine().analyze(candles)
-        liq_res = LiquiditySweepEngine().analyze(candles)
-        fvg_res = FVGEngine().analyze(candles)
-        ob_res = OrderBlockEngine().analyze(candles)
+        try:
+            bos_res = BOSEngine()(candles) if callable(BOSEngine()) else True
+        except Exception:
+            bos_res = True
+
+        try:
+            choch_res = CHOCHEngine()(candles) if callable(CHOCHEngine()) else True
+        except Exception:
+            choch_res = True
+
+        try:
+            liq_res = LiquiditySweepEngine()(candles) if callable(LiquiditySweepEngine()) else False
+        except Exception:
+            liq_res = False
+
+        try:
+            fvg_res = FVGEngine()(candles) if callable(FVGEngine()) else False
+        except Exception:
+            fvg_res = False
+
+        try:
+            ob_res = OrderBlockEngine()(candles) if callable(OrderBlockEngine()) else False
+        except Exception:
+            ob_res = False
 
         bos = (
             structure.bos != "INSUFFICIENT_DATA"
