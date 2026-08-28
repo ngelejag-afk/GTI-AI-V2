@@ -11,29 +11,24 @@ from strategy.domain.structure_pipeline import StructurePipeline
 from strategy.smc_engine import SMCEngine
 
 
-class BOSEngine:
-    def __call__(self, *args, **kwargs):
-        return True
+def BOSEngine(*args, **kwargs):
+    return True
 
 
-class CHOCHEngine:
-    def __call__(self, *args, **kwargs):
-        return True
+def CHOCHEngine(*args, **kwargs):
+    return True
 
 
-class LiquiditySweepEngine:
-    def __call__(self, *args, **kwargs):
-        return False
+def LiquiditySweepEngine(*args, **kwargs):
+    return False
 
 
-class FVGEngine:
-    def __call__(self, *args, **kwargs):
-        return False
+def FVGEngine(*args, **kwargs):
+    return False
 
 
-class OrderBlockEngine:
-    def __call__(self, *args, **kwargs):
-        return False
+def OrderBlockEngine(*args, **kwargs):
+    return False
 
 
 class SMCAnalyzer:
@@ -58,11 +53,11 @@ class SMCAnalyzer:
             except Exception:
                 return default_val
 
-        bos_val = call_engine(BOSEngine(), True)
-        choch_val = call_engine(CHOCHEngine(), True)
-        liq_val = call_engine(LiquiditySweepEngine(), False)
-        fvg_val = call_engine(FVGEngine(), False)
-        ob_val = call_engine(OrderBlockEngine(), False)
+        bos_val = call_engine(BOSEngine, True)
+        choch_val = call_engine(CHOCHEngine, True)
+        liq_val = call_engine(LiquiditySweepEngine, False)
+        fvg_val = call_engine(FVGEngine, False)
+        ob_val = call_engine(OrderBlockEngine, False)
 
         bos = (
             structure.bos != "INSUFFICIENT_DATA"
