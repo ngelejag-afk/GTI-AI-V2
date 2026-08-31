@@ -302,4 +302,4 @@ class SMCAnalyzer:
             "reasons": [
                 "Insufficient closed candle data."
             ],
-        }
+    }
