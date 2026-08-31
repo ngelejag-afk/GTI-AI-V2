@@ -8,10 +8,10 @@ Order Blocks, FVG, liquidity sweeps), and pushes signals straight to ntfy.sh.
 Runs entirely on Render. No Termux, no MT5, no external dependency —
 pure Python standard library only.
 
-v2: scans every 1 minute for tighter (sniper) entries, but throttles
-new-entry notifications to at most one every 30 minutes. If a trade is
-already open, hitting its Stop Loss or Take Profit triggers an
-IMMEDIATE ntfy.sh push regardless of the throttle.
+v3: retries failed ntfy.sh deliveries (up to 3 attempts) and always
+records the outcome of a closed trade in /health as "last_closed_trade",
+so the outcome is visible even if the push notification itself never
+reached the phone.
 """
 
 import os
@@ -36,6 +36,8 @@ CANDLE_LIMIT = 150
 
 NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "gti_ai_btcusd_signals")
+NTFY_MAX_RETRIES = 3
+NTFY_RETRY_DELAY_SECONDS = 5
 
 # Scan the market every 1 minute for tighter, more responsive entries.
 SCAN_INTERVAL_SECONDS = int(os.environ.get("SCAN_INTERVAL_SECONDS", "60"))
@@ -72,6 +74,11 @@ class State:
     # The currently "open" trade this service is tracking (from the last
     # BUY/SELL notification it sent). None if no trade is being tracked.
     active_trade = None
+
+    # Record of how the most recent trade ended, so the outcome is
+    # visible via /health even if the push notification itself failed
+    # to reach the phone.
+    last_closed_trade = None
 
     # Monotonic timestamp (time.time()) of the last new-entry notification.
     last_signal_notify_ts = 0.0
@@ -286,21 +293,30 @@ def analyze(candles):
 
 
 # ---------------------------------------------------------------------------
-# ntfy.sh push
+# ntfy.sh push (with retries — a transient failure no longer gets silently
+# swallowed)
 # ---------------------------------------------------------------------------
 def send_ntfy(title, message, priority="3", tag="hourglass"):
     url = f"{NTFY_SERVER}/{NTFY_TOPIC}"
-    req = urllib.request.Request(
-        url,
-        data=message.encode("utf-8"),
-        method="POST",
-        headers={"Title": title, "Priority": priority, "Tags": tag},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            print(f"[NTFY] Sent to {NTFY_TOPIC} — status {resp.status}")
-    except urllib.error.URLError as exc:
-        print(f"[NTFY ERROR] Failed to notify {NTFY_TOPIC}: {exc}")
+
+    for attempt in range(1, NTFY_MAX_RETRIES + 1):
+        req = urllib.request.Request(
+            url,
+            data=message.encode("utf-8"),
+            method="POST",
+            headers={"Title": title, "Priority": priority, "Tags": tag},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                print(f"[NTFY] Sent to {NTFY_TOPIC} — status {resp.status} (attempt {attempt})")
+                return True
+        except urllib.error.URLError as exc:
+            print(f"[NTFY ERROR] Attempt {attempt}/{NTFY_MAX_RETRIES} failed: {exc}")
+            if attempt < NTFY_MAX_RETRIES:
+                time.sleep(NTFY_RETRY_DELAY_SECONDS)
+
+    print(f"[NTFY ERROR] Giving up after {NTFY_MAX_RETRIES} attempts.")
+    return False
 
 
 def send_entry_notification(signal):
@@ -313,7 +329,7 @@ def send_entry_notification(signal):
         f"Entry: {signal['entry']:.2f}  SL: {signal['stop_loss']:.2f}  TP: {signal['take_profit']:.2f}"
     )
     tag = "chart_with_upwards_trend" if signal["decision"] == "BUY" else "chart_with_downwards_trend"
-    send_ntfy(title, message, priority="5", tag=tag)
+    return send_ntfy(title, message, priority="5", tag=tag)
 
 
 def send_exit_notification(trade, outcome, current_price):
@@ -326,14 +342,14 @@ def send_exit_notification(trade, outcome, current_price):
         f"SL: {trade['stop_loss']:.2f}  TP: {trade['take_profit']:.2f}"
     )
     tag = "moneybag" if outcome == "TP_HIT" else "warning"
-    send_ntfy(title, message, priority="5", tag=tag)
+    return send_ntfy(title, message, priority="5", tag=tag)
 
 
 # ---------------------------------------------------------------------------
 # Trade tracking — checks the open trade against the latest price every scan
 # ---------------------------------------------------------------------------
 def check_active_trade(current_price):
-    """Returns True if an exit notification was sent (trade closed)."""
+    """Returns True if the trade closed this scan (TP/SL hit)."""
     trade = State.active_trade
     if not trade:
         return False
@@ -353,7 +369,17 @@ def check_active_trade(current_price):
 
     if outcome:
         print(f"[TRADE] {outcome} — {trade['direction']} @ {trade['entry']} (price {current_price})")
-        send_exit_notification(trade, outcome, current_price)
+        delivered = send_exit_notification(trade, outcome, current_price)
+
+        # Always record the outcome — even if the push notification
+        # failed, /health will show what happened and when.
+        State.last_closed_trade = {
+            **trade,
+            "outcome": outcome,
+            "exit_price": current_price,
+            "notified": delivered,
+            "closed_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        }
         State.active_trade = None
         return True
 
@@ -387,13 +413,15 @@ def scan_once():
             if result["decision"] in ("BUY", "SELL") and State.active_trade is None:
                 elapsed = time.time() - State.last_signal_notify_ts
                 if elapsed >= MIN_SIGNAL_NOTIFY_INTERVAL_SECONDS:
-                    send_entry_notification(result)
+                    delivered = send_entry_notification(result)
                     State.active_trade = {
                         "symbol": result["symbol"],
                         "direction": result["decision"],
                         "entry": result["entry"],
                         "stop_loss": result["stop_loss"],
                         "take_profit": result["take_profit"],
+                        "opened_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                        "entry_notified": delivered,
                     }
                     State.last_signal_notify_ts = time.time()
                 else:
@@ -438,6 +466,7 @@ class ServiceHandler(BaseHTTPRequestHandler):
                     "service": "GTI BTCUSD Binance Signal Service",
                     "last_error": State.last_error,
                     "active_trade": State.active_trade,
+                    "last_closed_trade": State.last_closed_trade,
                     "updated": State.last_signal["updated"],
                 })
             return
@@ -458,10 +487,10 @@ def run_http_server():
 
 def main():
     print("=" * 60)
-    print("GTI BTCUSD BINANCE SIGNAL SERVICE (v2)")
+    print("GTI BTCUSD BINANCE SIGNAL SERVICE (v3)")
     print("=" * 60)
     print(f"Symbol            : {BINANCE_SYMBOL}")
-    print(f"Interval          : {BINANCE_INTERVAL}")
+    print(f"Interval          : {SCAN_INTERVAL_SECONDS}s" if False else f"Interval          : {BINANCE_INTERVAL}")
     print(f"Scan every        : {SCAN_INTERVAL_SECONDS}s")
     print(f"Entry notify every: min {MIN_SIGNAL_NOTIFY_INTERVAL_SECONDS}s apart")
     print(f"NTFY topic        : {NTFY_TOPIC}")
