@@ -310,7 +310,7 @@ def send_ntfy(title, message, priority="3", tag="hourglass"):
             with urllib.request.urlopen(req, timeout=10) as resp:
                 print(f"[NTFY] Sent to {NTFY_TOPIC} — status {resp.status} (attempt {attempt})")
                 return True
-        except urllib.error.URLError as exc:
+        except Exception as exc:
             print(f"[NTFY ERROR] Attempt {attempt}/{NTFY_MAX_RETRIES} failed: {exc}")
             if attempt < NTFY_MAX_RETRIES:
                 time.sleep(NTFY_RETRY_DELAY_SECONDS)
@@ -333,10 +333,17 @@ def send_entry_notification(signal):
 
 
 def send_exit_notification(trade, outcome, current_price):
-    """outcome: 'TP_HIT' or 'SL_HIT'"""
-    label = "TAKE PROFIT HIT 🎯" if outcome == "TP_HIT" else "STOP LOSS HIT 🛑"
+    """outcome: 'TP_HIT' or 'SL_HIT'
+
+    NOTE: ntfy.sh delivers the Title as an HTTP header, and HTTP headers
+    must be ASCII/Latin-1 — emoji here would crash the request before it
+    ever reaches ntfy.sh. Emoji are safe inside the message body only.
+    """
+    label = "TAKE PROFIT HIT" if outcome == "TP_HIT" else "STOP LOSS HIT"
     title = f"{trade['symbol']} {label}"
+    emoji = "🎯" if outcome == "TP_HIT" else "🛑"
     message = (
+        f"{emoji} {label}\n"
         f"Trade: {trade['direction']} opened at {trade['entry']:.2f}\n"
         f"Current price: {current_price:.2f}\n"
         f"SL: {trade['stop_loss']:.2f}  TP: {trade['take_profit']:.2f}"
@@ -369,10 +376,18 @@ def check_active_trade(current_price):
 
     if outcome:
         print(f"[TRADE] {outcome} — {trade['direction']} @ {trade['entry']} (price {current_price})")
-        delivered = send_exit_notification(trade, outcome, current_price)
 
-        # Always record the outcome — even if the push notification
-        # failed, /health will show what happened and when.
+        # Any failure in send_exit_notification (network issue, encoding
+        # bug, etc.) must NEVER leave active_trade permanently stuck —
+        # that would silently block all future signals forever. The
+        # trade is always closed and recorded regardless of whether the
+        # push notification itself succeeded.
+        delivered = False
+        try:
+            delivered = send_exit_notification(trade, outcome, current_price)
+        except Exception as exc:
+            print(f"[NTFY ERROR] send_exit_notification crashed: {exc}")
+
         State.last_closed_trade = {
             **trade,
             "outcome": outcome,
@@ -490,7 +505,7 @@ def main():
     print("GTI BTCUSD BINANCE SIGNAL SERVICE (v3)")
     print("=" * 60)
     print(f"Symbol            : {BINANCE_SYMBOL}")
-    print(f"Interval          : {SCAN_INTERVAL_SECONDS}s" if False else f"Interval          : {BINANCE_INTERVAL}")
+    print(f"Interval          : {BINANCE_INTERVAL}")
     print(f"Scan every        : {SCAN_INTERVAL_SECONDS}s")
     print(f"Entry notify every: min {MIN_SIGNAL_NOTIFY_INTERVAL_SECONDS}s apart")
     print(f"NTFY topic        : {NTFY_TOPIC}")
