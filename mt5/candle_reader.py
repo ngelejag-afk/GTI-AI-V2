@@ -1,53 +1,34 @@
 from __future__ import annotations
 
-"""
-GTI AI
-Candle Reader
-Version 2.0
-"""
-
-
-from mt5.mt5_connector import MT5Connector
+from mt5.bridge_client import BridgeMarketData
 
 
 class CandleReader:
     """
-    Reads candle data from MetaTrader 5.
+    Candle reader for GTI-AI-V2.
+
+    Android/Termux does not require the MetaTrader5 Python package.
+    Candles are obtained from the read-only MT5 Bridge.
     """
 
-    def __init__(self) -> None:
-        self.connector = MT5Connector()
-
-    def get_candles(self, symbol: str, timeframe, count: int = 100):
-        """
-        Return the latest candles.
-
-        Returns an empty list if MT5 is unavailable.
-        """
-
-        if not self.connector.connect():
-            return []
-
-        try:
-            import MetaTrader5 as mt5
-        except ModuleNotFoundError:
-            return []
-
-        rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
-
-        if rates is None:
-            return []
-
-        return list(rates)
-
-    @staticmethod
-    def read(symbol: str, timeframe, count: int = 100):
-        """
-        Compatibility wrapper used by MultiTimeframeReader.
-        """
-
-        return CandleReader().get_candles(
-            symbol=symbol,
-            timeframe=timeframe,
-            count=count,
+    @classmethod
+    def get_candles(
+        cls,
+        symbol: str = "XAUUSD",
+        timeframe: str = "H1",
+        count: int = 200,
+    ):
+        return BridgeMarketData.candles(
+            symbol,
+            timeframe,
+            count,
         )
+
+    @classmethod
+    def read(
+        cls,
+        symbol: str = "XAUUSD",
+        timeframe: str = "H1",
+        count: int = 200,
+    ):
+        return cls.get_candles(symbol, timeframe, count)
