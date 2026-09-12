@@ -4,6 +4,7 @@ Signal calculation only: this module never sends an MT5 order.
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
+from datetime import datetime, timezone
 
 
 @dataclass(frozen=True)
@@ -72,9 +73,11 @@ class InstitutionalEntryEngine:
         choch = cls._choch(bars["M5"], h4)
         displacement = cls._displacement(bars["M5"], h4)
         zone = cls._zone(bars["M5"], h4)
+        m5_ema10 = cls._ema10_confirmed(bars["M5"], h4)
         m1 = cls._m1_trigger(bars["M1"], h4, zone)
+        m1_ema10 = cls._ema10_confirmed(bars["M1"], h4)
 
-        if not (choch and displacement and zone and m1):
+        if not (choch and displacement and zone and m1 and m5_ema10 and m1_ema10):
             return cls._no(
                 "WAITING_FOR_EXECUTION_CONFLUENCE",
                 h4_bias=h4,
@@ -84,6 +87,8 @@ class InstitutionalEntryEngine:
                 displacement=displacement,
                 execution_zone=zone,
                 m1_confirmation=m1,
+                m5_ema10_confirmation=m5_ema10,
+                m1_ema10_confirmation=m1_ema10,
             )
 
         current = ask if h4 == "BUY" else bid
@@ -161,17 +166,45 @@ class InstitutionalEntryEngine:
         }
 
     @staticmethod
-    def _bar(x: Any) -> Bar:
+    def _timestamp(value: Any) -> int:
+        if isinstance(value, (int, float)):
+            return int(value)
+
+        text = str(value).strip()
+
+        try:
+            return int(float(text))
+        except ValueError:
+            pass
+
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                dt = datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+                return int(dt.timestamp())
+            except ValueError:
+                continue
+
+        raise ValueError(f"INVALID_BAR_TIMESTAMP:{text}")
+
+    @classmethod
+    def _bar(cls, x: Any) -> Bar:
         if isinstance(x, dict):
+            raw_time = x.get("timestamp", x.get("time"))
             return Bar(
-                int(x.get("timestamp", x.get("time"))),
-                float(x["open"]), float(x["high"]),
-                float(x["low"]), float(x["close"]),
+                cls._timestamp(raw_time),
+                float(x["open"]),
+                float(x["high"]),
+                float(x["low"]),
+                float(x["close"]),
                 float(x.get("volume", x.get("tick_volume", 0))),
             )
+
         return Bar(
-            int(x["time"]), float(x["open"]), float(x["high"]),
-            float(x["low"]), float(x["close"]),
+            cls._timestamp(x["time"]),
+            float(x["open"]),
+            float(x["high"]),
+            float(x["low"]),
+            float(x["close"]),
             float(x.get("tick_volume", 0)),
         )
 
@@ -179,8 +212,9 @@ class InstitutionalEntryEngine:
     def _closed(cls, rows) -> list[Bar]:
         result = [cls._bar(x) for x in list(rows or [])]
         result.sort(key=lambda x: x.t)
-        # MT5 position 0 is the still-forming candle.
-        return result[:-1] if len(result) > 1 else []
+        # Upstream adapters are responsible for supplying
+        # fully closed candles. Do not drop the latest candle.
+        return result
 
     @staticmethod
     def _trend(x: list[Bar]) -> str:
@@ -252,6 +286,30 @@ class InstitutionalEntryEngine:
             return (b.l, b.h, "ORDER_BLOCK")
 
         return None
+
+    @staticmethod
+    def _ema10_confirmed(x: list[Bar], direction: str) -> bool:
+        if len(x) < 11:
+            return False
+
+        closes = [bar.c for bar in x]
+        multiplier = 2.0 / 11.0
+
+        ema = sum(closes[:10]) / 10.0
+        for value in closes[10:]:
+            ema = (value - ema) * multiplier + ema
+
+        previous = sum(closes[:10]) / 10.0
+        for value in closes[9:10]:
+            previous = (value - previous) * multiplier + previous
+
+        current_close = closes[-1]
+
+        if direction == "BUY":
+            return current_close > ema and ema > previous
+
+        return current_close < ema and ema < previous
+
 
     @staticmethod
     def _m1_trigger(x: list[Bar], direction: str, zone) -> bool:
