@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from datetime import datetime, timezone
 
 import json
 import os
@@ -47,6 +48,11 @@ def _save_signal_state(state: dict) -> None:
 
 
 
+def _xau_weekend_closed() -> bool:
+    symbol = SYMBOL.upper().replace(" ", "")
+    return symbol in {"XAU/USD", "XAUUSD"} and datetime.now(timezone.utc).weekday() >= 5
+
+
 def _read_api_key() -> str:
     with open(".env", "r", encoding="utf-8") as f:
         for line in f:
@@ -92,6 +98,15 @@ def main() -> None:
     print("Trading: DISABLED")
     print("Provider: Twelve Data")
     print(f"Symbol: {SYMBOL}")
+    if _xau_weekend_closed():
+        print(json.dumps({
+            "status": "NO TRADE",
+            "reason": "XAUUSD_WEEKEND_CLOSED",
+            "symbol": SYMBOL,
+            "utc_day": datetime.now(timezone.utc).strftime("%A"),
+        }, indent=2))
+        return
+
 
     try:
         quote = TwelveDataXAU.get_quote()
