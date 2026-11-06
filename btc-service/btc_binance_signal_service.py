@@ -511,6 +511,14 @@ def main():
     print(f"NTFY topic        : {NTFY_TOPIC}")
     print("=" * 60)
 
+    # TEMPORARY ONE-TIME RENDER NTFY DELIVERY TEST
+    send_ntfy(
+        "GTI RENDER NTFY TEST",
+        "SUCCESS: This notification originated from the GTI BTC Render service.",
+        priority="3",
+        tag="white_check_mark",
+    )
+
     scanner_thread = threading.Thread(target=scan_loop, daemon=True)
     scanner_thread.start()
 
