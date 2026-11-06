@@ -20,6 +20,7 @@ import time
 import threading
 import urllib.request
 import urllib.error
+from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -35,9 +36,10 @@ BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines"
 CANDLE_LIMIT = 150
 
 NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "gti_ai_btcusd_signals")
-NTFY_MAX_RETRIES = 3
-NTFY_RETRY_DELAY_SECONDS = 5
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
+NTFY_MAX_RETRIES = max(1, int(os.environ.get("NTFY_MAX_RETRIES", "3")))
+NTFY_RETRY_DELAY_SECONDS = max(1, int(os.environ.get("NTFY_RETRY_DELAY_SECONDS", "5")))
+NTFY_MAX_BACKOFF_SECONDS = 30
 
 # Scan the market every 1 minute for tighter, more responsive entries.
 SCAN_INTERVAL_SECONDS = int(os.environ.get("SCAN_INTERVAL_SECONDS", "60"))
@@ -80,8 +82,22 @@ class State:
     # to reach the phone.
     last_closed_trade = None
 
-    # Monotonic timestamp (time.time()) of the last new-entry notification.
+    # Separate successful notification and retry timestamps.
     last_signal_notify_ts = 0.0
+    last_signal_attempt_ts = 0.0
+
+    ntfy_delivery = {
+        "successes": 0,
+        "failures": 0,
+        "rate_limited": 0,
+        "last_status": "never",
+        "last_http_status": None,
+        "last_error": None,
+        "last_attempts": 0,
+        "last_attempt_at": None,
+        "last_success_at": None,
+    }
+    last_entry_notification = None
 
 
 # ---------------------------------------------------------------------------
@@ -296,10 +312,49 @@ def analyze(candles):
 # ntfy.sh push (with retries — a transient failure no longer gets silently
 # swallowed)
 # ---------------------------------------------------------------------------
+def _retry_after_seconds(value):
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value.strip()))
+    except (TypeError, ValueError):
+        try:
+            retry_at = parsedate_to_datetime(value)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=timezone.utc)
+            return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+
+def _record_ntfy_result(status, attempts, error=None, http_status=None):
+    data = State.ntfy_delivery
+    data["last_status"] = status
+    data["last_attempts"] = attempts
+    data["last_error"] = str(error) if error else None
+    data["last_http_status"] = http_status
+    data["last_attempt_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    if status == "delivered":
+        data["successes"] += 1
+        data["last_success_at"] = data["last_attempt_at"]
+    else:
+        data["failures"] += 1
+
+
 def send_ntfy(title, message, priority="3", tag="hourglass"):
+    if not NTFY_TOPIC:
+        error = "NTFY_TOPIC is missing; refusing to send to an unintended default topic."
+        print(f"[NTFY CONFIG ERROR] {error}")
+        _record_ntfy_result("configuration_error", 0, error=error)
+        return False
+
     url = f"{NTFY_SERVER}/{NTFY_TOPIC}"
+    last_error = None
+    last_http_status = None
+    attempts_made = 0
 
     for attempt in range(1, NTFY_MAX_RETRIES + 1):
+        attempts_made = attempt
         req = urllib.request.Request(
             url,
             data=message.encode("utf-8"),
@@ -308,14 +363,54 @@ def send_ntfy(title, message, priority="3", tag="hourglass"):
         )
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
-                print(f"[NTFY] Sent to {NTFY_TOPIC} — status {resp.status} (attempt {attempt})")
+                print(f"[NTFY] Accepted by {NTFY_SERVER}/{NTFY_TOPIC} — HTTP {resp.status} (attempt {attempt})")
+                _record_ntfy_result("delivered", attempt, http_status=resp.status)
                 return True
-        except Exception as exc:
-            print(f"[NTFY ERROR] Attempt {attempt}/{NTFY_MAX_RETRIES} failed: {exc}")
+        except urllib.error.HTTPError as exc:
+            last_error, last_http_status = exc, exc.code
+            if exc.code == 429:
+                State.ntfy_delivery["rate_limited"] += 1
+                retry_after = _retry_after_seconds((exc.headers or {}).get("Retry-After"))
+                delay = retry_after if retry_after is not None else min(
+                    NTFY_RETRY_DELAY_SECONDS * (2 ** (attempt - 1)),
+                    NTFY_MAX_BACKOFF_SECONDS,
+                )
+                print(f"[NTFY 429] Rate limited (attempt {attempt}/{NTFY_MAX_RETRIES}); retry delay={delay:.1f}s")
+                if delay > NTFY_MAX_BACKOFF_SECONDS:
+                    print("[NTFY 429] Retry-After exceeds wait limit; stopping retries.")
+                    break
+                if attempt < NTFY_MAX_RETRIES:
+                    time.sleep(delay)
+                    continue
+            elif exc.code in (408, 425, 500, 502, 503, 504):
+                delay = min(
+                    NTFY_RETRY_DELAY_SECONDS * (2 ** (attempt - 1)),
+                    NTFY_MAX_BACKOFF_SECONDS,
+                )
+                print(f"[NTFY HTTP {exc.code}] Retryable failure; attempt {attempt}/{NTFY_MAX_RETRIES}, wait={delay}s")
+                if attempt < NTFY_MAX_RETRIES:
+                    time.sleep(delay)
+                    continue
+            else:
+                print(f"[NTFY HTTP {exc.code}] Non-retryable delivery failure: {exc}")
+                break
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+            delay = min(
+                NTFY_RETRY_DELAY_SECONDS * (2 ** (attempt - 1)),
+                NTFY_MAX_BACKOFF_SECONDS,
+            )
+            print(f"[NTFY NETWORK ERROR] Attempt {attempt}/{NTFY_MAX_RETRIES} failed: {exc}")
             if attempt < NTFY_MAX_RETRIES:
-                time.sleep(NTFY_RETRY_DELAY_SECONDS)
+                time.sleep(delay)
+                continue
+        except Exception as exc:
+            last_error = exc
+            print(f"[NTFY ERROR] Unexpected non-retryable failure: {exc}")
+            break
 
-    print(f"[NTFY ERROR] Giving up after {NTFY_MAX_RETRIES} attempts.")
+    print(f"[NTFY ERROR] Delivery failed after {attempts_made} attempt(s).")
+    _record_ntfy_result("failed", attempts_made, error=last_error, http_status=last_http_status)
     return False
 
 
@@ -420,28 +515,50 @@ def scan_once():
             #    always fires immediately, bypassing the notify throttle.
             check_active_trade(current_price)
 
-            # 2. Consider a new entry notification, but only if:
-            #    - the engine found a BUY/SELL
-            #    - we're not already tracking an open trade
-            #    - at least MIN_SIGNAL_NOTIFY_INTERVAL_SECONDS has passed
-            #      since the last entry notification
+            # 2. Consider a new entry notification.
             if result["decision"] in ("BUY", "SELL") and State.active_trade is None:
-                elapsed = time.time() - State.last_signal_notify_ts
-                if elapsed >= MIN_SIGNAL_NOTIFY_INTERVAL_SECONDS:
+                current_ts = time.time()
+                since_success = current_ts - State.last_signal_notify_ts
+                since_attempt = current_ts - State.last_signal_attempt_ts
+
+                success_ok = (
+                    State.last_signal_notify_ts == 0.0
+                    or since_success >= MIN_SIGNAL_NOTIFY_INTERVAL_SECONDS
+                )
+                retry_ok = (
+                    State.last_signal_attempt_ts == 0.0
+                    or since_attempt >= SCAN_INTERVAL_SECONDS
+                )
+
+                if success_ok and retry_ok:
+                    State.last_signal_attempt_ts = current_ts
                     delivered = send_entry_notification(result)
-                    State.active_trade = {
-                        "symbol": result["symbol"],
+
+                    State.last_entry_notification = {
                         "direction": result["decision"],
                         "entry": result["entry"],
-                        "stop_loss": result["stop_loss"],
-                        "take_profit": result["take_profit"],
-                        "opened_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
-                        "entry_notified": delivered,
+                        "notified": delivered,
+                        "attempted_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
                     }
-                    State.last_signal_notify_ts = time.time()
+
+                    if delivered:
+                        State.last_signal_notify_ts = time.time()
+                        State.active_trade = {
+                            "symbol": result["symbol"],
+                            "direction": result["decision"],
+                            "entry": result["entry"],
+                            "stop_loss": result["stop_loss"],
+                            "take_profit": result["take_profit"],
+                            "opened_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                            "entry_notified": True,
+                        }
+                    else:
+                        print("[TRADE TRACKING] Notification failed; no active trade created.")
+
+                elif not success_ok:
+                    print("[THROTTLE] Successful notification cooldown is active.")
                 else:
-                    print(f"[THROTTLE] New {result['decision']} signal suppressed "
-                          f"({elapsed:.0f}s since last notify, need {MIN_SIGNAL_NOTIFY_INTERVAL_SECONDS}s)")
+                    print("[RETRY THROTTLE] Waiting for the next scan interval.")
 
         print("[SCAN]", json.dumps(result, ensure_ascii=False))
 
@@ -482,6 +599,8 @@ class ServiceHandler(BaseHTTPRequestHandler):
                     "last_error": State.last_error,
                     "active_trade": State.active_trade,
                     "last_closed_trade": State.last_closed_trade,
+                    "last_entry_notification": State.last_entry_notification,
+                    "ntfy_delivery": State.ntfy_delivery,
                     "updated": State.last_signal["updated"],
                 })
             return
@@ -501,6 +620,11 @@ def run_http_server():
 
 
 def main():
+    if not NTFY_TOPIC:
+        raise RuntimeError("NTFY_TOPIC environment variable is required; refusing to start with an implicit destination.")
+    if not NTFY_SERVER.startswith(("https://", "http://")):
+        raise RuntimeError("NTFY_SERVER must be an HTTP(S) URL.")
+
     print("=" * 60)
     print("GTI BTCUSD BINANCE SIGNAL SERVICE (v3)")
     print("=" * 60)
