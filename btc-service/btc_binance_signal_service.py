@@ -16,6 +16,7 @@ reached the phone.
 
 import os
 import json
+import copy
 import time
 import threading
 import urllib.request
@@ -41,6 +42,12 @@ NTFY_MAX_RETRIES = max(1, int(os.environ.get("NTFY_MAX_RETRIES", "3")))
 NTFY_RETRY_DELAY_SECONDS = max(1, int(os.environ.get("NTFY_RETRY_DELAY_SECONDS", "5")))
 NTFY_MAX_BACKOFF_SECONDS = 30
 
+# Independent monitoring heartbeat; 900 seconds = 15 minutes.
+NTFY_HEARTBEAT_INTERVAL_SECONDS = max(
+    0, int(os.environ.get("NTFY_HEARTBEAT_INTERVAL_SECONDS", "900"))
+)
+BINANCE_TICKER_PRICE_URL = "https://data-api.binance.vision/api/v3/ticker/price"
+
 # Scan the market every 1 minute for tighter, more responsive entries.
 SCAN_INTERVAL_SECONDS = int(os.environ.get("SCAN_INTERVAL_SECONDS", "60"))
 
@@ -59,6 +66,7 @@ MIN_RR = 2.0         # minimum reward:risk enforced on generated trade levels
 # ---------------------------------------------------------------------------
 class State:
     lock = threading.Lock()
+    ntfy_lock = threading.RLock()
     last_signal = {
         "symbol": BINANCE_SYMBOL.replace("USDT", "USD"),
         "decision": "WAIT",
@@ -328,17 +336,18 @@ def _retry_after_seconds(value):
 
 
 def _record_ntfy_result(status, attempts, error=None, http_status=None):
-    data = State.ntfy_delivery
-    data["last_status"] = status
-    data["last_attempts"] = attempts
-    data["last_error"] = str(error) if error else None
-    data["last_http_status"] = http_status
-    data["last_attempt_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    if status == "delivered":
-        data["successes"] += 1
-        data["last_success_at"] = data["last_attempt_at"]
-    else:
-        data["failures"] += 1
+    with State.ntfy_lock:
+        data = State.ntfy_delivery
+        data["last_status"] = status
+        data["last_attempts"] = attempts
+        data["last_error"] = str(error) if error else None
+        data["last_http_status"] = http_status
+        data["last_attempt_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        if status == "delivered":
+            data["successes"] += 1
+            data["last_success_at"] = data["last_attempt_at"]
+        else:
+            data["failures"] += 1
 
 
 def send_ntfy(title, message, priority="3", tag="hourglass"):
@@ -369,7 +378,8 @@ def send_ntfy(title, message, priority="3", tag="hourglass"):
         except urllib.error.HTTPError as exc:
             last_error, last_http_status = exc, exc.code
             if exc.code == 429:
-                State.ntfy_delivery["rate_limited"] += 1
+                with State.ntfy_lock:
+                    State.ntfy_delivery["rate_limited"] += 1
                 retry_after = _retry_after_seconds((exc.headers or {}).get("Retry-After"))
                 delay = retry_after if retry_after is not None else min(
                     NTFY_RETRY_DELAY_SECONDS * (2 ** (attempt - 1)),
@@ -497,6 +507,126 @@ def check_active_trade(current_price):
 
 
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Monitoring-only Binance live-price heartbeat
+# ---------------------------------------------------------------------------
+
+def fetch_live_price():
+    """Fetch Binance ticker price, not an MT5 execution price."""
+    url = f"{BINANCE_TICKER_PRICE_URL}?symbol={BINANCE_SYMBOL}"
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "gti-ai-render-heartbeat/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    price = float(payload["price"])
+    if not (price > 0 and price < float("inf")):
+        raise ValueError("Invalid Binance ticker price")
+    return price
+
+
+def send_heartbeat_once():
+    """Send monitoring status without reading or changing trade state."""
+    price = None
+    price_error = None
+    try:
+        price = fetch_live_price()
+    except Exception as exc:
+        # A failed price request must not suppress the monitoring heartbeat.
+        price_error = str(exc) or exc.__class__.__name__
+
+    now = datetime.now(timezone.utc)
+
+    # Read scanner state, then release its lock before reading delivery metrics.
+    with State.lock:
+        signal = dict(State.last_signal or {})
+        scanner_error = getattr(State, "last_error", None)
+
+    with State.ntfy_lock:
+        delivery = dict(State.ntfy_delivery)
+
+    updated = signal.get("updated", "Unknown")
+    decision = signal.get("decision", "WAIT")
+    bias = signal.get("market_bias", "Unknown")
+
+    try:
+        signal_dt = datetime.strptime(
+            updated, "%Y-%m-%d %H:%M:%S UTC"
+        ).replace(tzinfo=timezone.utc)
+        age = max(0, int((now - signal_dt).total_seconds()))
+        freshness = (
+            "FRESH"
+            if age <= max(300, 5 * SCAN_INTERVAL_SECONDS)
+            else "STALE"
+        )
+        age_text = f"{age // 60} minutes"
+    except (TypeError, ValueError):
+        freshness = "UNKNOWN"
+        age_text = "unknown"
+
+    scanner_status = "ERROR" if scanner_error else "ONLINE"
+    previous_delivery = delivery.get("last_status", "never")
+    if previous_delivery == "delivered":
+        delivery_status = "DELIVERED"
+    elif previous_delivery == "never":
+        delivery_status = "NEVER"
+    else:
+        delivery_status = "FAILED"
+
+    price_text = f"{price:.2f}" if price is not None else "UNAVAILABLE"
+    price_error_text = price_error or "None"
+
+    message = (
+        "GTI BTCUSDT LIVE MARKET HEARTBEAT\n"
+        "Monitoring only - no broker execution or position verification.\n"
+        f"Binance live price: {price_text}\n"
+        f"Binance price error: {price_error_text}\n"
+        f"Price observation UTC: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+        f"Last signal update: {updated}\n"
+        f"Signal age: {age_text}\n"
+        f"Signal freshness: {freshness}\n"
+        f"Last decision: {decision}\n"
+        f"Market bias: {bias}\n"
+        f"Scanner status: {scanner_status}\n"
+        f"Scanner error: {scanner_error or 'None'}\n"
+        f"Aggregate ntfy delivery (alerts + heartbeats): {delivery_status}\n"
+        f"Aggregate ntfy error: {delivery.get('last_error') or 'None'}\n"
+        "Execution mode: MANUAL MT5 ONLY"
+    )
+
+    return send_ntfy(
+        title="GTI BTCUSDT HEARTBEAT",
+        message=message,
+        priority="1",
+        tag="heartbeat",
+    )
+
+def ntfy_heartbeat_loop():
+    """Periodic monitoring only; no trade creation or closure."""
+    interval = NTFY_HEARTBEAT_INTERVAL_SECONDS
+
+    if interval <= 0:
+        print("[HEARTBEAT] disabled", flush=True)
+        return
+
+    while True:
+        try:
+            delivered = send_heartbeat_once()
+            print(
+                f"[HEARTBEAT] interval={interval}s "
+                f"delivery={'OK' if delivered else 'FAILED'}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"[HEARTBEAT ERROR] {exc}", flush=True)
+
+        time.sleep(interval)
+
+
 # Scan loop
 # ---------------------------------------------------------------------------
 def scan_once():
@@ -592,17 +722,22 @@ class ServiceHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
+            # Snapshot scanner-owned state first, then notification metrics.
+            # Lock order is State.lock -> State.ntfy_lock, matching scan_once().
+            # Deep copies detach nested mutable values before serialization.
             with State.lock:
-                self.send_json({
+                health_data = {
                     "status": "ok" if State.last_error is None else "error",
                     "service": "GTI BTCUSD Binance Signal Service",
                     "last_error": State.last_error,
-                    "active_trade": State.active_trade,
-                    "last_closed_trade": State.last_closed_trade,
-                    "last_entry_notification": State.last_entry_notification,
-                    "ntfy_delivery": State.ntfy_delivery,
+                    "active_trade": copy.deepcopy(State.active_trade),
+                    "last_closed_trade": copy.deepcopy(State.last_closed_trade),
+                    "last_entry_notification": copy.deepcopy(State.last_entry_notification),
                     "updated": State.last_signal["updated"],
-                })
+                }
+                with State.ntfy_lock:
+                    health_data["ntfy_delivery"] = copy.deepcopy(State.ntfy_delivery)
+            self.send_json(health_data)
             return
 
         if self.path in ("/", "/api/signal"):
@@ -637,6 +772,14 @@ def main():
 
     scanner_thread = threading.Thread(target=scan_loop, daemon=True)
     scanner_thread.start()
+
+    heartbeat_thread = threading.Thread(
+        target=ntfy_heartbeat_loop,
+        name="ntfy-heartbeat",
+        daemon=True,
+    )
+    heartbeat_thread.start()
+    print("[HEARTBEAT] thread started", flush=True)
 
     run_http_server()
 
