@@ -8,6 +8,8 @@ Order Blocks, FVG, liquidity sweeps), and pushes signals straight to ntfy.sh.
 Runs entirely on Render. No Termux, no MT5, no external dependency —
 pure Python standard library only.
 
+Reliability V2 candidate: serialized Binance/ntfy outbound requests.
+
 v3: retries failed ntfy.sh deliveries (up to 3 attempts) and always
 records the outcome of a closed trade in /health as "last_closed_trade",
 so the outcome is visible even if the push notification itself never
@@ -41,6 +43,8 @@ NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 NTFY_MAX_RETRIES = max(1, int(os.environ.get("NTFY_MAX_RETRIES", "3")))
 NTFY_RETRY_DELAY_SECONDS = max(1, int(os.environ.get("NTFY_RETRY_DELAY_SECONDS", "5")))
 NTFY_MAX_BACKOFF_SECONDS = 30
+# Serialize cooldown check + notification HTTP attempts across scanner/heartbeat.
+NTFY_SEND_LOCK = threading.Lock()
 
 # Independent monitoring heartbeat; 900 seconds = 15 minutes.
 NTFY_HEARTBEAT_INTERVAL_SECONDS = max(
@@ -67,6 +71,8 @@ MIN_RR = 2.0         # minimum reward:risk enforced on generated trade levels
 class State:
     lock = threading.Lock()
     ntfy_lock = threading.RLock()
+    ntfy_blocked_until = 0.0
+    ntfy_consecutive_429 = 0
     last_signal = {
         "symbol": BINANCE_SYMBOL.replace("USDT", "USD"),
         "decision": "WAIT",
@@ -98,6 +104,8 @@ class State:
         "successes": 0,
         "failures": 0,
         "rate_limited": 0,
+        "deferred": 0,
+        "cooldown_seconds": 0,
         "last_status": "never",
         "last_http_status": None,
         "last_error": None,
@@ -109,13 +117,74 @@ class State:
 
 
 # ---------------------------------------------------------------------------
-# Binance market data
+# Binance market data and shared rate-limit protection
 # ---------------------------------------------------------------------------
+BINANCE_LOCK = threading.Lock()
+# Serialize cooldown check + outbound request so concurrent callers cannot
+# pass the same preflight check and hit Binance together. This lock is never
+# used for metrics/state snapshots.
+BINANCE_REQUEST_LOCK = threading.Lock()
+BINANCE_BLOCKED_UNTIL = 0.0
+BINANCE_CONSECUTIVE_LIMITS = 0
+BINANCE_LAST_HTTP_STATUS = None
+BINANCE_LAST_ERROR = None
+BINANCE_RATE_LIMIT_EVENTS = 0
+BINANCE_FALLBACK_418_SECONDS = 900
+BINANCE_FALLBACK_429_SECONDS = 60
+BINANCE_MAX_FALLBACK_SECONDS = 3600
+
+
+class BinanceCooldownError(RuntimeError):
+    """Raised locally while Binance has instructed this service to back off."""
+
+
+def binance_cooldown_remaining():
+    with BINANCE_LOCK:
+        return max(0.0, BINANCE_BLOCKED_UNTIL - time.monotonic())
+
+
+def _binance_urlopen_serialized(request, timeout):
+    global BINANCE_BLOCKED_UNTIL, BINANCE_CONSECUTIVE_LIMITS
+    global BINANCE_LAST_HTTP_STATUS, BINANCE_LAST_ERROR, BINANCE_RATE_LIMIT_EVENTS
+    remaining = binance_cooldown_remaining()
+    if remaining > 0:
+        raise BinanceCooldownError(f"Binance cooldown active for {remaining:.0f}s; request suppressed")
+    try:
+        response = urllib.request.urlopen(request, timeout=timeout)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (418, 429):
+            retry_after = _retry_after_seconds((exc.headers or {}).get("Retry-After"))
+            with BINANCE_LOCK:
+                BINANCE_CONSECUTIVE_LIMITS += 1
+                base = BINANCE_FALLBACK_418_SECONDS if exc.code == 418 else BINANCE_FALLBACK_429_SECONDS
+                fallback = min(base * (2 ** (BINANCE_CONSECUTIVE_LIMITS - 1)), BINANCE_MAX_FALLBACK_SECONDS)
+                delay = retry_after if retry_after is not None else fallback
+                BINANCE_BLOCKED_UNTIL = max(BINANCE_BLOCKED_UNTIL, time.monotonic() + delay)
+                BINANCE_LAST_HTTP_STATUS = exc.code
+                BINANCE_LAST_ERROR = str(exc)
+                BINANCE_RATE_LIMIT_EVENTS += 1
+            print(f"[BINANCE HTTP {exc.code}] Shared cooldown={delay:.0f}s", flush=True)
+        raise
+    else:
+        with BINANCE_LOCK:
+            BINANCE_CONSECUTIVE_LIMITS = 0
+            BINANCE_LAST_HTTP_STATUS = getattr(response, "status", 200)
+            BINANCE_LAST_ERROR = None
+        return response
+
+
+def _binance_urlopen(request, timeout):
+    # Keep the request lock from cooldown check through HTTP response headers.
+    # The metrics lock remains short-lived and is not held during network I/O.
+    with BINANCE_REQUEST_LOCK:
+        return _binance_urlopen_serialized(request, timeout)
+
+
 def fetch_klines(symbol=BINANCE_SYMBOL, interval=BINANCE_INTERVAL, limit=CANDLE_LIMIT):
     url = f"{BINANCE_KLINES_URL}?symbol={symbol}&interval={interval}&limit={limit}"
     req = urllib.request.Request(url, headers={"User-Agent": "gti-ai-render/1.0"})
 
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with _binance_urlopen(req, timeout=15) as resp:
         raw = json.loads(resp.read().decode("utf-8"))
 
     candles = []
@@ -350,13 +419,23 @@ def _record_ntfy_result(status, attempts, error=None, http_status=None):
             data["failures"] += 1
 
 
-def send_ntfy(title, message, priority="3", tag="hourglass"):
+def _send_ntfy_serialized(title, message, priority="3", tag="hourglass"):
     if not NTFY_TOPIC:
         error = "NTFY_TOPIC is missing; refusing to send to an unintended default topic."
         print(f"[NTFY CONFIG ERROR] {error}")
         _record_ntfy_result("configuration_error", 0, error=error)
         return False
 
+    with State.ntfy_lock:
+        remaining = max(0.0, State.ntfy_blocked_until - time.monotonic())
+        if remaining > 0:
+            State.ntfy_delivery["deferred"] += 1
+            State.ntfy_delivery["cooldown_seconds"] = int(remaining + 0.999)
+            State.ntfy_delivery["last_status"] = "rate_limited_cooldown"
+            State.ntfy_delivery["last_error"] = f"ntfy cooldown active ({remaining:.0f}s remaining)"
+            print(f"[NTFY COOLDOWN] Suppressed; {remaining:.0f}s remaining", flush=True)
+            return False
+        State.ntfy_delivery["cooldown_seconds"] = 0
     url = f"{NTFY_SERVER}/{NTFY_TOPIC}"
     last_error = None
     last_http_status = None
@@ -373,25 +452,26 @@ def send_ntfy(title, message, priority="3", tag="hourglass"):
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 print(f"[NTFY] Accepted by {NTFY_SERVER}/{NTFY_TOPIC} — HTTP {resp.status} (attempt {attempt})")
+                with State.ntfy_lock:
+                    State.ntfy_consecutive_429 = 0
+                    State.ntfy_blocked_until = 0.0
+                    State.ntfy_delivery["cooldown_seconds"] = 0
                 _record_ntfy_result("delivered", attempt, http_status=resp.status)
                 return True
         except urllib.error.HTTPError as exc:
             last_error, last_http_status = exc, exc.code
             if exc.code == 429:
-                with State.ntfy_lock:
-                    State.ntfy_delivery["rate_limited"] += 1
                 retry_after = _retry_after_seconds((exc.headers or {}).get("Retry-After"))
-                delay = retry_after if retry_after is not None else min(
-                    NTFY_RETRY_DELAY_SECONDS * (2 ** (attempt - 1)),
-                    NTFY_MAX_BACKOFF_SECONDS,
-                )
-                print(f"[NTFY 429] Rate limited (attempt {attempt}/{NTFY_MAX_RETRIES}); retry delay={delay:.1f}s")
-                if delay > NTFY_MAX_BACKOFF_SECONDS:
-                    print("[NTFY 429] Retry-After exceeds wait limit; stopping retries.")
-                    break
-                if attempt < NTFY_MAX_RETRIES:
-                    time.sleep(delay)
-                    continue
+                with State.ntfy_lock:
+                    State.ntfy_consecutive_429 += 1
+                    fallback = min(60 * (2 ** (State.ntfy_consecutive_429 - 1)), 3600)
+                    delay = retry_after if retry_after is not None else fallback
+                    State.ntfy_blocked_until = max(State.ntfy_blocked_until, time.monotonic() + delay)
+                    State.ntfy_delivery["rate_limited"] += 1
+                    State.ntfy_delivery["cooldown_seconds"] = int(delay + 0.999)
+                last_error = f"HTTP 429; delivery suppressed for {delay:.0f}s"
+                print(f"[NTFY 429] No immediate retry; shared cooldown={delay:.0f}s", flush=True)
+                break
             elif exc.code in (408, 425, 500, 502, 503, 504):
                 delay = min(
                     NTFY_RETRY_DELAY_SECONDS * (2 ** (attempt - 1)),
@@ -422,6 +502,13 @@ def send_ntfy(title, message, priority="3", tag="hourglass"):
     print(f"[NTFY ERROR] Delivery failed after {attempts_made} attempt(s).")
     _record_ntfy_result("failed", attempts_made, error=last_error, http_status=last_http_status)
     return False
+
+
+def send_ntfy(title, message, priority="3", tag="hourglass"):
+    # One sender at a time: later callers re-check the cooldown only after
+    # the preceding HTTP attempt has recorded its result.
+    with NTFY_SEND_LOCK:
+        return _send_ntfy_serialized(title, message, priority, tag)
 
 
 def send_entry_notification(signal):
@@ -520,7 +607,7 @@ def fetch_live_price():
         url,
         headers={"User-Agent": "gti-ai-render-heartbeat/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=10) as response:
+    with _binance_urlopen(req, timeout=10) as response:
         payload = json.loads(response.read().decode("utf-8"))
 
     price = float(payload["price"])
@@ -701,7 +788,11 @@ def scan_once():
 def scan_loop():
     while True:
         scan_once()
-        time.sleep(SCAN_INTERVAL_SECONDS)
+        remaining = binance_cooldown_remaining()
+        delay = max(SCAN_INTERVAL_SECONDS, remaining)
+        if remaining > 0:
+            print(f"[SCAN] Binance cooldown; next scan in {delay:.0f}s", flush=True)
+        time.sleep(delay)
 
 
 # ---------------------------------------------------------------------------
@@ -737,6 +828,13 @@ class ServiceHandler(BaseHTTPRequestHandler):
                 }
                 with State.ntfy_lock:
                     health_data["ntfy_delivery"] = copy.deepcopy(State.ntfy_delivery)
+            with BINANCE_LOCK:
+                health_data["binance_data"] = {
+                    "last_http_status": BINANCE_LAST_HTTP_STATUS,
+                    "last_error": BINANCE_LAST_ERROR,
+                    "rate_limit_events": BINANCE_RATE_LIMIT_EVENTS,
+                    "cooldown_seconds": int(max(0.0, BINANCE_BLOCKED_UNTIL - time.monotonic()) + 0.999),
+                }
             self.send_json(health_data)
             return
 
